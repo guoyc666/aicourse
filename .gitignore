@@ -1,0 +1,6 @@
+# 忽略个人文件
+personalFiles/
+
+# 忽略操作系统文件
+.DS_Store
+Thumbs.db
