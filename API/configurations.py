@@ -6,6 +6,16 @@ from typing import List, Dict, Union
 PROJECT_ROOT = Path(__file__).parent.resolve()
 
 # ------------------------------
+# 数据库配置
+# ------------------------------
+class DatabaseConfig:
+    HOST = "localhost"
+    PORT = 3306
+    NAME = "zygc"
+    USER = "root"
+    PASSWORD = "password"
+
+# ------------------------------
 # 存储配置
 # ------------------------------
 class StorageConfig:
@@ -75,7 +85,7 @@ class ApiConfig:
     # 下载文件的URL前缀
     DOWNLOAD_URL_PREFIX: str = f"{BASE_PATH}/resources"
     
-    # 分页默认配置
+    # 获取资源时分页默认配置
     DEFAULT_PAGE: int = 1
     DEFAULT_PAGE_SIZE: int = 20
 
@@ -105,6 +115,7 @@ class Config:
     file_limits = FileLimitConfig
     api = ApiConfig
     log = LogConfig
+    database = DatabaseConfig
 
 
 # 实例化配置对象，供其他模块导入使用
@@ -114,6 +125,6 @@ config = Config()
 for dir_path in [
     config.storage.UPLOAD_DIR,
     config.storage.TEMP_DIR,
-    config.log.LOG_DIR
+    config.log.LOG_DIR,
 ]:
     dir_path.mkdir(parents=True, exist_ok=True)

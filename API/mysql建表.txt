@@ -1,0 +1,14 @@
+CREATE TABLE `resource` (
+  `id` INT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `title` VARCHAR(200) NOT NULL COMMENT '资源标题',
+  `type` ENUM('pdf','ppt','video','text') NOT NULL COMMENT '资源类型',
+  `path` VARCHAR(255) NOT NULL COMMENT '文件路径',
+  `keywords` TEXT COMMENT '自动提取关键词',
+  `uploader_id` INT NOT NULL COMMENT '上传教师 ID',
+  `upload_time` DATETIME NOT NULL COMMENT '上传时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_uploader_id` (`uploader_id`),
+  KEY `idx_type` (`type`),
+  KEY `idx_upload_time` (`upload_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资源文件信息表';
+

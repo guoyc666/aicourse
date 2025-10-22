@@ -2,11 +2,13 @@ import os
 import magic  # pip install python-magic-bin
 import uuid
 from pathlib import Path
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, status
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse,  FileResponse
 import shutil
 from datetime import datetime
+import mysql.connector  # 新增：导入mysql连接器
+from mysql.connector import Error  # 新增：导入错误处理
 from configurations import config  # 导入配置对象
 
 # 初始化FastAPI应用
@@ -25,6 +27,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 新增：数据库连接工具函数
+def get_db_connection():
+    """创建数据库连接"""
+    try:
+        connection = mysql.connector.connect(
+            host=config.database.HOST,
+            database=config.database.NAME,
+            user=config.database.USER,
+            password=config.database.PASSWORD,
+            port=config.database.PORT
+        )
+        if connection.is_connected():
+            return connection
+    except Error as e:
+        print(f"数据库连接错误: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"数据库连接失败: {str(e)}"
+        )
 
 # 1.资源上传接口
 def get_unique_filename(original_filename: str) -> str:
@@ -55,14 +76,25 @@ def verify_file_extension(filename: str) -> bool:
     file_extension = Path(filename).suffix.lower()
     return file_extension in config.file_limits.ALLOWED_EXTENSIONS
 
+# 新增：提取关键词的临时函数（实际应用中可能需要更复杂的实现）
+def extract_keywords(content: str) -> str:
+    """简单提取关键词示例，实际应根据文件内容提取"""
+    # 这里仅作为占位，实际应根据文件类型使用合适的提取方法
+    return ""
+
 @app.post(config.api.UPLOAD_ENDPOINT, summary="上传资源文件")
 async def upload_resource(
     file: UploadFile = File(...),
     title: str = Form(..., description="文件标题"),
     type: str = Form(..., description="文件类型分类"),
-    uploader: str = Form(..., description="上传者名称或ID"),
+    uploader: int = Form(..., description="上传教师ID"),  
     description: str = Form(None, description="资源详细描述（可选）")
 ):
+    # 检查文件类型是否符合枚举值
+    allowed_types = ['pdf', 'ppt', 'video', 'text']
+    if type not in allowed_types:
+        type = 'else'
+    
     # 1. 验证文件扩展名
     if not verify_file_extension(file.filename):
         allowed_exts = ", ".join(config.file_limits.ALLOWED_EXTENSIONS)
@@ -110,7 +142,7 @@ async def upload_resource(
                 detail=f"不支持的文件类型，允许的类型：{allowed_types}"
             )
         
-        # 构建文件信息（包含新增的上传者和描述信息）
+        # 构建文件信息
         file_info = {
             "file_id": uuid.uuid4().hex,
             "original_name": file.filename,
@@ -118,7 +150,7 @@ async def upload_resource(
             "title": title,
             "type": type,
             "uploader": uploader,  
-            "description": description,  
+            "description": description,
             "size": file_size,
             "mime_type": magic.from_file(str(file_path), mime=True),
             "upload_time": datetime.now().isoformat(),
@@ -127,25 +159,53 @@ async def upload_resource(
             "download_url": f"{config.api.DOWNLOAD_URL_PREFIX}/{file_path.relative_to(config.storage.UPLOAD_DIR)}"
         }
         
-        # TODO: 调用文件分析函数，由其他开发者实现
-        # analyze_file(
-        #     filename=file_info["unique_filename"],
-        #     file_path=file_info["storage_path"],
-        #     original_name=file_info["original_name"],
-        #     file_id=file_info["file_id"],
-        #     title=file_info["title"],
-        #     file_type=file_info["type"],
-        #     uploader=file_info["uploader"],  # 传递上传者信息
-        #     description=file_info["description"],  # 传递描述信息
-        #     size=file_info["size"],
-        #     mime_type=file_info["mime_type"]
-        # )
+        # 提取关键词（实际应用中应根据文件内容提取）
+        keywords = extract_keywords(description or "")
+        
+        # 新增：将资源信息写入数据库
+        connection = get_db_connection()
+        if connection:
+            cursor = connection.cursor()
+            try:
+                # 插入数据库的SQL语句
+                insert_query = """
+                INSERT INTO resource (title, type, path, keywords, uploader_id, upload_time)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """
+                # 准备插入的数据
+                current_time = datetime.now()
+                record = (
+                    title,
+                    type,
+                    str(file_path),  # 存储文件的完整路径
+                    keywords,
+                    uploader,
+                    current_time
+                )
+                # 执行插入
+                cursor.execute(insert_query, record)
+                connection.commit()
+                # 获取插入的记录ID
+                resource_id = cursor.lastrowid
+                file_info["resource_id"] = resource_id  # 添加到返回信息中
+            except Error as e:
+                connection.rollback()  # 出错时回滚
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"数据库操作失败: {str(e)}"
+                )
+            finally:
+                # 关闭游标和连接
+                if cursor:
+                    cursor.close()
+                if connection.is_connected():
+                    connection.close()
         
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={
                 "code": 200,
-                "message": "文件上传成功",
+                "message": "文件上传成功并已保存到数据库",
                 "data": file_info
             }
         )
@@ -164,15 +224,162 @@ async def upload_resource(
             }
         )
 
-# 2.服务健康检查接口
+# 资源列表查询接口（修复datetime序列化问题）
+@app.get(f"{config.api.BASE_PATH}/resource/list", summary="获取资源列表")
+async def get_resource_list(
+    page: int = 1,
+    page_size: int = 20,
+    type: str = None,
+    uploader_id: int = None
+):
+    """获取资源列表，支持分页和筛选"""
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)  # 返回字典格式结果
+        
+        # 构建查询条件
+        where_conditions = []
+        params = []
+        
+        if type:
+            where_conditions.append("type = %s")
+            params.append(type)
+        if uploader_id:
+            where_conditions.append("uploader_id = %s")
+            params.append(uploader_id)
+        
+        # 基础SQL
+        base_sql = "SELECT id, title, type, uploader_id, upload_time FROM resource"
+        count_sql = "SELECT COUNT(*) as total FROM resource"
+        
+        # 拼接条件
+        if where_conditions:
+            where_clause = " WHERE " + " AND ".join(where_conditions)
+            base_sql += where_clause
+            count_sql += where_clause
+        
+        # 分页处理
+        offset = (page - 1) * page_size
+        base_sql += " ORDER BY upload_time DESC LIMIT %s OFFSET %s"
+        params.extend([page_size, offset])
+        
+        # 执行查询
+        cursor.execute(count_sql, params[:len(params)-2] if where_conditions else [])
+        total = cursor.fetchone()["total"]
+        
+        cursor.execute(base_sql, params)
+        resources = cursor.fetchall()
+        
+        # 关键修复：将datetime对象转换为ISO格式字符串
+        for item in resources:
+            if isinstance(item["upload_time"], datetime):
+                item["upload_time"] = item["upload_time"].isoformat()  # 转换为ISO格式字符串
+        
+        # 计算总页数
+        total_pages = (total + page_size - 1) // page_size
+        
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "code": 200,
+                "message": "资源列表查询成功",
+                "data": {
+                    "list": resources,
+                    "pagination": {
+                        "page": page,
+                        "page_size": page_size,
+                        "total": total,
+                        "total_pages": total_pages
+                    }
+                }
+            }
+        )
+        
+    except Error as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"数据库查询失败: {str(e)}"
+        )
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'connection' in locals() and connection.is_connected():
+            connection.close()
+
+# 3. 资源下载接口
+@app.get(f"{config.api.BASE_PATH}/resource/download", summary="下载指定资源")
+async def download_resource(
+    resource_id: int = Query(..., description="资源ID", ge=1)  # 使用查询参数
+):
+    """根据资源ID下载对应的文件"""
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        
+        # 查询资源信息
+        query = "SELECT title, path, type FROM resource WHERE id = %s"
+        cursor.execute(query, (resource_id,))
+        resource = cursor.fetchone()
+        
+        if not resource:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="资源不存在或已被删除"
+            )
+        
+        # 验证文件是否存在
+        file_path = Path(resource["path"])
+        if not file_path.exists() or not file_path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="文件不存在，请联系管理员"
+            )
+        
+        # 获取文件MIME类型
+        mime_type = magic.from_file(str(file_path), mime=True)
+        
+        # 构建下载文件名
+        download_filename = f"{resource['title']}.{resource['type']}"
+        # 处理特殊字符
+        download_filename = resource["path"].split('\\')[-1]    ####### 文件名
+        
+        return FileResponse(
+            path=file_path,
+            media_type=mime_type,
+            filename=download_filename
+        )
+        
+    except Error as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"数据库操作失败: {str(e)}"
+        )
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'connection' in locals() and connection.is_connected():
+            connection.close()
+
+
+# ex.服务健康检查接口
 @app.get(f"{config.api.BASE_PATH}/health", summary="服务健康检查")
 async def health_check():
+    # 新增：检查数据库连接状态
+    db_status = "正常"
+    try:
+        connection = get_db_connection()
+        if connection:
+            connection.close()
+    except:
+        db_status = "异常"
+    
     return {
         "code": 200,
         "message": "服务运行正常",
         "data": {
             "timestamp": datetime.now().isoformat(),
-            "upload_dir": str(config.storage.UPLOAD_DIR)
+            "upload_dir": str(config.storage.UPLOAD_DIR),
+            "database_status": db_status  # 新增：数据库状态
         }
     }
 
