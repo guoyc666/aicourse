@@ -1,6 +1,30 @@
-# 忽略个人文件
-personalFiles/
+# Node.js
+node_modules/
+dist/
+*.log
 
-# 忽略操作系统文件
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+*.env
+
+# Docker
+data/
+uploads/
+
+# ide
+.vscode/
+*.code-workspace
+.idea/
+
+# OS
 .DS_Store
 Thumbs.db
+
+# Others
+*.swp
+*.swo
