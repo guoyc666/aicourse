@@ -1,0 +1,410 @@
+// 全局样式
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+#app {
+  height: 100%;
+}
+
+// Element Plus 主题定制
+:root {
+  --el-color-primary: #409eff;
+  --el-color-success: #67c23a;
+  --el-color-warning: #e6a23c;
+  --el-color-danger: #f56c6c;
+  --el-color-info: #909399;
+}
+
+// 通用类
+.text-center {
+  text-align: center;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.mb-10 {
+  margin-bottom: 10px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.mt-10 {
+  margin-top: 10px;
+}
+
+.mt-20 {
+  margin-top: 20px;
+}
+
+.p-10 {
+  padding: 10px;
+}
+
+.p-20 {
+  padding: 20px;
+}
+
+// 卡片样式
+.card-shadow {
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+// 按钮样式
+.btn-group {
+  display: flex;
+  gap: 8px;
+}
+
+// 表格样式
+.table-header {
+  background: #f5f7fa;
+  font-weight: 500;
+}
+
+// 表单样式
+.form-section {
+  margin-bottom: 24px;
+  
+  .section-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: #303133;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e4e7ed;
+  }
+}
+
+// 状态标签
+.status-tag {
+  &.success {
+    color: #67c23a;
+    background-color: #f0f9ff;
+    border-color: #67c23a;
+  }
+  
+  &.warning {
+    color: #e6a23c;
+    background-color: #fdf6ec;
+    border-color: #e6a23c;
+  }
+  
+  &.danger {
+    color: #f56c6c;
+    background-color: #fef0f0;
+    border-color: #f56c6c;
+  }
+  
+  &.info {
+    color: #909399;
+    background-color: #f4f4f5;
+    border-color: #909399;
+  }
+}
+
+// 加载动画
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+}
+
+// 空状态
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #909399;
+  
+  .empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+  
+  .empty-text {
+    font-size: 14px;
+  }
+}
+
+// 响应式设计
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .page-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  .el-col {
+    margin-bottom: 16px;
+  }
+}
+
+// 滚动条样式
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+// 动画效果
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-enter-from {
+  transform: translateX(-100%);
+}
+
+.slide-leave-to {
+  transform: translateX(100%);
+}
+
+// 工具提示样式
+.tooltip-content {
+  max-width: 300px;
+  word-wrap: break-word;
+}
+
+// 图表容器
+.chart-container {
+  width: 100%;
+  height: 400px;
+}
+
+// 文件上传区域
+.upload-dragger {
+  border: 2px dashed #d9d9d9;
+  border-radius: 6px;
+  width: 100%;
+  height: 180px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s;
+  
+  &:hover {
+    border-color: #409eff;
+  }
+  
+  .upload-icon {
+    font-size: 67px;
+    color: #c0c4cc;
+    margin: 40px 0 16px;
+    line-height: 50px;
+  }
+  
+  .upload-text {
+    color: #606266;
+    font-size: 14px;
+    text-align: center;
+  }
+}
+
+// 搜索框样式
+.search-input {
+  .el-input__wrapper {
+    border-radius: 20px;
+  }
+}
+
+// 标签页样式
+.custom-tabs {
+  .el-tabs__header {
+    margin-bottom: 20px;
+  }
+  
+  .el-tabs__item {
+    font-weight: 500;
+  }
+}
+
+// 对话框样式
+.custom-dialog {
+  .el-dialog__header {
+    padding: 20px 20px 10px;
+    border-bottom: 1px solid #e4e7ed;
+  }
+  
+  .el-dialog__body {
+    padding: 20px;
+  }
+  
+  .el-dialog__footer {
+    padding: 10px 20px 20px;
+    border-top: 1px solid #e4e7ed;
+  }
+}
+
+// 菜单样式
+.custom-menu {
+  .el-menu-item {
+    &.is-active {
+      background-color: #ecf5ff;
+      color: #409eff;
+    }
+  }
+}
+
+// 表格样式增强
+.enhanced-table {
+  .el-table__header {
+    th {
+      background-color: #fafafa;
+      color: #606266;
+      font-weight: 500;
+    }
+  }
+  
+  .el-table__row {
+    &:hover {
+      background-color: #f5f7fa;
+    }
+  }
+}
+
+// 表单样式增强
+.enhanced-form {
+  .el-form-item__label {
+    font-weight: 500;
+    color: #606266;
+  }
+  
+  .el-input__wrapper {
+    border-radius: 4px;
+  }
+}
+
+// 按钮样式增强
+.enhanced-button {
+  &.el-button--primary {
+    background: linear-gradient(135deg, #409eff 0%, #5dade2 100%);
+    border: none;
+    
+    &:hover {
+      background: linear-gradient(135deg, #5dade2 0%, #409eff 100%);
+    }
+  }
+}
+
+// 卡片样式增强
+.enhanced-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid #ebeef5;
+  
+  .el-card__header {
+    background-color: #fafafa;
+    border-bottom: 1px solid #ebeef5;
+    font-weight: 500;
+  }
+}
+
+// 分页样式
+.enhanced-pagination {
+  .el-pagination {
+    justify-content: center;
+    margin-top: 20px;
+  }
+}
+
+// 消息提示样式
+.enhanced-message {
+  .el-message {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+}
+
+// 加载状态样式
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+// 响应式网格
+.responsive-grid {
+  display: grid;
+  gap: 20px;
+  
+  &.grid-1 {
+    grid-template-columns: 1fr;
+  }
+  
+  &.grid-2 {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+  
+  &.grid-3 {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+  
+  &.grid-4 {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+}
+
+// 打印样式
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-break {
+    page-break-before: always;
+  }
+}
