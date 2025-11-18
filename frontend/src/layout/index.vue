@@ -87,7 +87,7 @@
             <template #title>讨论区</template>
           </el-menu-item>
           
-          <el-menu-item index="/ai-assistant">
+          <el-menu-item index="/ai-assistant/">
           <el-icon><ChatDotRound /></el-icon>
           <template #title>AI助教</template>
         </el-menu-item>

@@ -15,6 +15,7 @@ venv/
 # Docker
 data/
 uploads/
+hfd_models/*
 
 # ide
 .vscode/

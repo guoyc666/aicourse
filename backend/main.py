@@ -12,18 +12,16 @@ from database import get_db, engine, Base
 from models import User, Role, Permission
 from auth import authenticate_user, create_access_token, get_current_user, verify_permission
 from schemas import UserCreate, UserLogin, UserResponse, Token, RoleResponse, TopicResponse, ReplyResponse
-from routers import auth, users, tasks, topics
+from routers import auth, users, tasks, topics, ai_assistant
 from file_resources import router as file_router
 from question import router as question_router
 
-load_dotenv()
-
+load_dotenv(".env")
 # 创建数据库表
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="AI辅助学习系统",
-    description="多角色权限管理系统",
     version="1.0.0"
 )
 
@@ -43,10 +41,11 @@ app.include_router(tasks.router, prefix="/api/tasks", tags=["任务管理"])
 app.include_router(topics.router, prefix="/api/topics", tags=["讨论区"])
 app.include_router(file_router, prefix="", tags=["文件资源"])  # 注意：file_router内部已包含/api前缀
 app.include_router(question_router, prefix="", tags=["题库"])
+app.include_router(ai_assistant.router, prefix="/api/ai", tags=["AI助手"])
 
 @app.get("/")
 async def root():
-    return {"message": "AI辅助学习系统 - 多角色支持API"}
+    return {"message": "AI辅助学习系统"}
 
 @app.get("/api/health")
 async def health_check():
@@ -54,3 +53,4 @@ async def health_check():
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    
