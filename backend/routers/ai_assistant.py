@@ -57,9 +57,13 @@ def delete_conversation(
     "/conversations", 
     response_model=list[schemas.ConversationSummary]
 )
-def list_conversations(db: Session = Depends(get_db)):
+def list_conversations(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
     convs = (
         db.query(models.Conversation)
+        .filter(models.Conversation.user_id == current_user.id)
         .order_by(models.Conversation.created_at.desc())
         .all()
     )
@@ -121,7 +125,7 @@ def send_message(
 # 获取会话的所有消息
 @router.get(
     "/conversations/{conv_id}/messages", 
-    response_model=list[schemas.MessageOut]
+    response_model=schemas.ConversationOut
 )
 def get_messages(
     conv_id: str, 
@@ -134,13 +138,8 @@ def get_messages(
 
     if not conv or conv.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="not authorized to access this conversation")
-    msgs = (
-        db.query(models.Message)
-        .filter(models.Message.conversation_id == conv_id)
-        .order_by(models.Message.created_at)
-        .all()
-    )
-    return msgs
+    
+    return conv
 
 
 @router.post("/easychat", response_model=str)

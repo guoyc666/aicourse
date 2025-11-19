@@ -11,13 +11,11 @@ from time import mktime
 from urllib.parse import urlencode
 from wsgiref.handlers import format_date_time
 import websocket  # 使用websocket_client
-
-from config import XF_IMAGE
-
-appid = XF_IMAGE["appid"]
-api_secret = XF_IMAGE["api_secret"]
-api_key = XF_IMAGE["api_key"]
-imageunderstanding_url = XF_IMAGE["imageunderstanding_url"]
+import os
+appid = os.getenv("XF_IMAGE_ID")
+api_secret = os.getenv("XF_IMAGE_SECRET")
+api_key = os.getenv("XF_IMAGE_KEY")
+imageunderstanding_url = os.getenv("XF_IMAGE_URL")
 
 class Ws_Param(object):
     # 初始化

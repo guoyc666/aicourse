@@ -120,6 +120,22 @@ const menuConfig: ConversationsProps["menu"] = (conversation) => ({
           if (idx !== -1) {
             items.value.splice(idx, 1);
           }
+
+          // 如果删除的是当前打开的会话，则从路由中移除 conv_id
+          try {
+            if (String(conversation.key) === String(convId.value)) {
+              const base = route.path.replace(/\/$/, "");
+              const trimmed =
+                typeof route.params.conv_id !== "undefined"
+                  ? base.replace(new RegExp(`/${route.params.conv_id}$`), "")
+                  : base;
+              // 导航到不带 conv_id 的路径
+              router.push(trimmed).catch(() => {});
+            }
+          } catch (e) {
+            console.warn('remove convId from route failed', e);
+          }
+
           messageApi.success("删除成功");
         } catch (err) {
           console.error("deleteConversation error", err);
@@ -153,6 +169,18 @@ const menuConfig: ConversationsProps["menu"] = (conversation) => ({
                 label: inputValue.value,
               };
             }
+
+            // 通知其他组件（例如 ChatPanel）该会话已重命名
+            try {
+              window.dispatchEvent(
+                new CustomEvent('conversation-renamed', {
+                  detail: { id: String(conversation.key), title: inputValue.value },
+                })
+              );
+            } catch (e) {
+              console.warn('dispatch conversation-renamed failed', e);
+            }
+
             messageApi.success("重命名成功");
           } catch (err) {
             console.error("renameConversation error", err);

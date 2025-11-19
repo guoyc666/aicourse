@@ -29,7 +29,7 @@ class ConversationSummary(BaseModel):
 
 class ConversationOut(BaseModel):
     id: str
-    name: str
+    title: str
     created_at: datetime
     messages: List[MessageOut] = []
 

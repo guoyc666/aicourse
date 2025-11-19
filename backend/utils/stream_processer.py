@@ -71,8 +71,6 @@ class StreamProcessor:
             + f"相关片段：{chr(10).join([d.get('doc') for d in docs])}"
             + f"用户问题：{user_input}"
         )
-        with open("debug_messages.json", "w", encoding="utf-8") as f:
-            json.dump(self.messages_payload, f, ensure_ascii=False, indent=2)
 
     def generate_stream(self):
         yield f"data: {json.dumps({'begin': True, 'conv_id': self.conv_id})}\n\n"
