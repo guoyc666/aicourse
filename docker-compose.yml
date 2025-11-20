@@ -10,8 +10,8 @@ services:
     environment:
       - DATABASE_URL=mysql://root:root@mysql:3306/aicourse
       - NEO4J_URL=bolt://neo4j:7687
-      - NEO4J_USER=neo4j
-      - NEO4J_PASS=neo4j123
+      - NEO4J_USER=aicourse
+      - NEO4J_PASS=aicourse
     volumes:
       - ./backend/app:/app
       - ./data/uploads:/app/data/uploads

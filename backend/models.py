@@ -213,3 +213,30 @@ class QuestionRecord(Base):
     knowledge_id = Column(Text, nullable=False)  # 涉及知识点ID列表（JSON格式）
     detail = Column(Text, nullable=False)  # 答题详情（JSON格式）
     total_questions = Column(Integer, nullable=False)  # 题目数量
+
+class KnowledgePoint(Base):
+    __tablename__ = "knowledge_points"
+
+    id = Column(String(64), primary_key=True, index=True)
+    name = Column(String(128), nullable=False)
+    category = Column(String(32), nullable=False)
+
+class Resource(Base):
+    __tablename__ = "resources"
+
+    id = Column(String(64), primary_key=True)
+    name = Column(String(128), nullable=False)
+    
+class KnowledgeResourceLink(Base):
+    __tablename__ = "knowledge_resource_links"
+
+    knowledge_id = Column(String(64), ForeignKey('knowledge_points.id'), primary_key=True)
+    resource_id = Column(String(64), ForeignKey('resources.id'), primary_key=True)
+    is_child = Column(Integer, nullable=False, default=0)
+
+class Mastery(Base):
+    __tablename__ = "mastery"
+
+    student_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    knowledge_id = Column(String(64), ForeignKey('knowledge_points.id'), primary_key=True)
+    mastery = Column(Float, nullable=False)

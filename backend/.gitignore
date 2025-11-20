@@ -3,7 +3,7 @@ uploads/
 temp_uploads/
 logs/
 *.log
-
+output
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
