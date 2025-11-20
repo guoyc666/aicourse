@@ -24,6 +24,7 @@ def analyse_file(filename, filepath, fileid, download_url, file_type):
             
         vs = VectorStore()
         vs.insert(docs, metas, ids)
+        print(f"新增{len(chunks)}个文本块到向量数据库，文件: {filename}")
     except Exception as e:
         print(f"解析文件 {filepath} 时出错: {e}")
         return

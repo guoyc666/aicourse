@@ -59,6 +59,7 @@ def _analyze_file_task(
 ):
     """后台任务：解析文件并存入向量数据库"""
     from utils.parse_file import analyse_file  # 延迟导入，避免循环依赖
+    file_type = Path(filepath).suffix.lower().lstrip(".")
     analyse_file(
         filename=filename,
         filepath=filepath,

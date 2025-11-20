@@ -13,7 +13,7 @@
             : new Date().getHours() < 18
             ? "下午好"
             : "晚上好"
-        }}
+        }}, {{ userStore.user?.full_name || userStore.user?.username }}
       </h2>
       <div>欢迎使用聊天助手，开始一个对话以获得帮助。</div>
     </div>
@@ -52,13 +52,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick, computed, onBeforeUnmount } from "vue";
+import {
+  ref,
+  onMounted,
+  watch,
+  nextTick,
+  computed,
+  onBeforeUnmount,
+} from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { message } from "ant-design-vue";
 import { Sender, XStream } from "ant-design-x-vue";
 import CustomBubble from "./CustomBubble.vue";
 import { getConversationMessages, getChatResponse } from "@/api/ai.js";
-import request from "@/api/request.js";
+import { useUserStore } from "@/stores/user";
+const userStore = useUserStore();
 const [messageApi, contextHolder] = message.useMessage();
 
 import { theme } from "ant-design-vue";
@@ -278,6 +286,14 @@ const onSubmit = async (value: string) => {
   align-items: center;
   font-size: 36px;
   gap: 10px;
+  background-color: #ffffff;
+}
+
+.welcome h2 {
+  font-size: 48px;
+  color: #333;
+  font-family: "楷体", "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans SC",
+    "PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei", Arial, sans-serif;
 }
 
 .welcome div {
@@ -289,7 +305,7 @@ const onSubmit = async (value: string) => {
   display: flex;
   gap: 25px;
   align-items: baseline;
-  background: linear-gradient(to bottom, #efeeee 0%, #ffffff 100%);
+  background: linear-gradient(to bottom, #f2f3f5 0%, #ffffff 100%);
   padding: 10px;
 }
 
