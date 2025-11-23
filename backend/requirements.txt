@@ -1,0 +1,27 @@
+# FastAPI核心依赖
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.5.0
+python-multipart==0.0.6
+
+# 认证和安全
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# 环境配置
+python-dotenv==1.0.0
+
+# 数据库
+sqlalchemy==2.0.23
+alembic==1.13.1
+
+# 数据库驱动 - 根据需要选择
+# PostgreSQL
+# psycopg2-binary==2.9.9
+# MySQL
+pymysql==1.1.0
+# SQLite (Python内置，无需安装)
+
+# 文件处理
+python-magic-bin==0.4.14  # 文件类型检测
+
