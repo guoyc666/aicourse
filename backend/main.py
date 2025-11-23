@@ -12,7 +12,7 @@ from database import get_db, engine, Base
 from models import User, Role, Permission
 from auth import authenticate_user, create_access_token, get_current_user, verify_permission
 from schemas import UserCreate, UserLogin, UserResponse, Token, RoleResponse, TopicResponse, ReplyResponse
-from routers import auth, users, tasks, topics
+from routers import auth, users, tasks, topics, ai_assistant, graph, knowledge, records, progress, mastery
 from file_resources import router as file_router
 from question import router as question_router
 
