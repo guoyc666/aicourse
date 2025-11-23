@@ -1,0 +1,169 @@
+<template>
+  <div class="echarts-graph">
+    <div class="selector">
+      <el-checkbox v-model="isTeacher" style="margin-right: 16px;">
+        教师身份
+      </el-checkbox>
+      <el-select v-model="calendarYear" style="width: 120px;">
+        <el-option v-for="y in years" :key="y" :label="y" :value="String(y)" />
+      </el-select>
+      <el-select
+        v-if="isTeacher"
+        v-model="selectedStudent"
+        style="width: 120px; margin-left: 16px;"
+        placeholder="选择学生"
+      >
+        <el-option :value="1" label="张三 (1)" />
+        <el-option :value="2" label="李四 (2)" />
+        <el-option :value="3" label="王五 (3)" />
+      </el-select>
+    </div>
+    <div ref="chartRef" style="width:100%;height:100%;"></div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, watch, onUnmounted } from "vue";
+import * as echarts from 'echarts/core';
+import {
+  TitleComponent,
+  CalendarComponent,
+  TooltipComponent,
+  VisualMapComponent
+} from 'echarts/components';
+import { HeatmapChart } from 'echarts/charts';
+import { CanvasRenderer } from 'echarts/renderers';
+import { useAnalysisStore } from "../../stores/analysisStore";
+
+const chartRef = ref<HTMLDivElement | null>(null);
+let myChart: echarts.ECharts | null = null;
+let resizeObserver: ResizeObserver | null = null;
+
+echarts.use([
+  TitleComponent,
+  CalendarComponent,
+  TooltipComponent,
+  VisualMapComponent,
+  HeatmapChart,
+  CanvasRenderer
+]);
+
+const currentYear = new Date().getFullYear();
+const years = Array.from({ length: 5 }, (_, i) => currentYear - i); // 最近5年
+const calendarYear = ref(currentYear);
+
+const analysisStore = useAnalysisStore();
+
+// 新增：教师身份和学生选择
+const isTeacher = ref(false);
+const selectedStudent = ref(1);
+
+const option = {
+  title: {
+    top: 30,
+    left: 'center',
+    text: '学习时长追踪'
+  },
+  tooltip: {
+    formatter: function (params: any) {
+      const date = params.value[0];
+      const duration = params.value[1]; // 直接就是分钟数
+      return `${date}<br/>学习时长：${duration} 分钟`;
+    }
+  },
+  visualMap: {
+    min: 0,
+    max: 600, // 10小时
+    type: 'piecewise',
+    orient: 'horizontal',
+    left: 'center',
+    top: 60,
+    pieces: [
+      { min: 240, label: '超过4小时', color: '#5070dd' },
+      { min: 120, max: 240, label: '2-4 小时', color: '#718be4' },
+      { min: 60, max: 120, label: '1-2 小时', color: '#94a6ea' },
+      { min: 30, max: 60, label: '0.5-1 小时', color: '#b3c1f1' },
+      { max: 30, label: '低于0.5小时', color: '#d4dcf7' }
+    ],
+  },
+  calendar: {
+    top: 130,
+    left: 30,
+    right: 30,
+    cellSize: ['auto', 20],
+    range: calendarYear.value,
+    itemStyle: {
+      borderWidth: 0.5
+    },
+    yearLabel: { show: true }
+  },
+  series: {
+    type: 'heatmap',
+    coordinateSystem: 'calendar',
+    data: analysisStore.calendarDurationRecords
+  }
+};
+
+onMounted(() => {
+  if (!chartRef.value) return;
+  myChart = echarts.init(chartRef.value);
+  myChart.setOption(option);
+
+  // 监听年份和学生变化
+  watch([calendarYear, selectedStudent], async ([newYear, newStudent]) => {
+    option.calendar.range = newYear;
+    await analysisStore.fetchCalendarDurations(newYear, newStudent);
+    option.series.data = analysisStore.calendarDurationRecords;
+    if (myChart) myChart.setOption(option, true);
+  }, { immediate: true });
+
+  // 监听教师身份变化，切换学生时自动刷新
+  watch(isTeacher, (val) => {
+    if (!val) {
+      selectedStudent.value = 1; // 非教师时默认学生1
+    }
+  });
+
+  // 监听日历格子点击事件
+  myChart.on('click', function (params: any) {
+    if (params.componentType === 'series' && params.seriesType === 'heatmap') {
+      // params.value[0] 是日期，params.value[1] 是时长
+      const date = params.value[0];
+      //const duration = params.value[1];
+      //console.log('点击日期:', date, '学习时长:', duration);
+      analysisStore.setSelectedDay(date);
+    }
+  });
+
+  // 监听容器大小变化
+  resizeObserver = new ResizeObserver(() => {
+    if (myChart) {
+      myChart.resize();
+    }
+  });
+  resizeObserver.observe(chartRef.value);
+});
+
+// 组件卸载时断开监听
+onUnmounted(() => {
+  if (resizeObserver) resizeObserver.disconnect();
+  if (myChart) {
+    myChart.dispose();
+    myChart = null;
+  }
+});
+</script>
+
+<style scoped>
+.echarts-graph{
+  position: relative;
+  width: 100%;
+  height: 300px;
+}
+.selector {
+  position: absolute;
+  left: 40px;
+  top: 60px;
+  z-index: 100;
+}
+</style>

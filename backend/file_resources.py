@@ -3,7 +3,7 @@ import magic  # pip install python-magic-bin
 import uuid
 import urllib.parse
 from pathlib import Path
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException, status, Depends
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException, status, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -50,6 +50,24 @@ def verify_file_extension(filename: str) -> bool:
     file_extension = Path(filename).suffix.lower()
     return file_extension in config.file_limits.ALLOWED_EXTENSIONS
 
+def _analyze_file_task(
+    filename: str,
+    filepath: str,
+    fileid: str,
+    file_type: str,
+    download_url: str
+):
+    """后台任务：解析文件并存入向量数据库"""
+    from utils.parse_file import analyse_file  # 延迟导入，避免循环依赖
+    file_type = Path(filepath).suffix.lower().lstrip(".")
+    analyse_file(
+        filename=filename,
+        filepath=filepath,
+        fileid=fileid,
+        file_type=file_type,
+        download_url=download_url,
+    )
+
 @router.post(config.api.UPLOAD_ENDPOINT, summary="上传资源文件")
 async def upload_resource(
     file: UploadFile = File(...),
@@ -57,7 +75,8 @@ async def upload_resource(
     type: str = Form(..., description="文件类型分类"),
     description: Optional[str] = Form(None, description="资源详细描述（可选）"),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     # 1. 验证文件扩展名
     if not verify_file_extension(file.filename):
@@ -149,19 +168,15 @@ async def upload_resource(
             "download_url": download_url
         }
         
-        # TODO: 调用文件分析函数，由其他开发者实现
-        # analyze_file(
-        #     filename=file_info["unique_filename"],
-        #     file_path=file_info["storage_path"],
-        #     original_name=file_info["original_name"],
-        #     file_id=file_info["file_id"],
-        #     title=file_info["title"],
-        #     file_type=file_info["type"],
-        #     uploader=file_info["uploader"],  # 传递上传者信息
-        #     description=file_info["description"],  # 传递描述信息
-        #     size=file_info["size"],
-        #     mime_type=file_info["mime_type"]
-        # )
+
+        background_tasks.add_task(
+            _analyze_file_task,
+            filename=title,
+            filepath=str(file_path),
+            fileid=file_id,
+            file_type=type,
+            download_url=download_url,
+        )
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,

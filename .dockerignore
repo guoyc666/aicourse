@@ -1,0 +1,29 @@
+# Node.js
+node_modules
+dist
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+*.env
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 文档和报告
+doc/
+report/

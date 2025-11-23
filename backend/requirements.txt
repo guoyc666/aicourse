@@ -14,14 +14,18 @@ python-dotenv==1.0.0
 # 数据库
 sqlalchemy==2.0.23
 alembic==1.13.1
-
-# 数据库驱动 - 根据需要选择
-# PostgreSQL
-# psycopg2-binary==2.9.9
-# MySQL
 pymysql==1.1.0
-# SQLite (Python内置，无需安装)
+chromadb==1.1.1
+neo4j
+py2neo
 
 # 文件处理
 python-magic-bin==0.4.14  # 文件类型检测
+pymupdf
+python-pptx
+python-docx
+pillow
+openai-whisper
 
+# ai
+openai

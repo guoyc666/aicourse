@@ -23,7 +23,6 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="AI辅助学习系统",
-    description="多角色权限管理系统",
     version="1.0.0"
 )
 
@@ -43,10 +42,16 @@ app.include_router(tasks.router, prefix="/api/tasks", tags=["任务管理"])
 app.include_router(topics.router, prefix="/api/topics", tags=["讨论区"])
 app.include_router(file_router, prefix="", tags=["文件资源"])  # 注意：file_router内部已包含/api前缀
 app.include_router(question_router, prefix="", tags=["题库"])
+app.include_router(ai_assistant.router, prefix="/api/ai", tags=["AI助手"])
+app.include_router(graph.router, prefix="/api")
+app.include_router(knowledge.router, prefix="/api")
+app.include_router(records.router, prefix="/api")
+app.include_router(progress.router, prefix="/api")
+app.include_router(mastery.router, prefix="/api")
 
 @app.get("/")
 async def root():
-    return {"message": "AI辅助学习系统 - 多角色支持API"}
+    return {"message": "AI辅助学习系统"}
 
 @app.get("/api/health")
 async def health_check():

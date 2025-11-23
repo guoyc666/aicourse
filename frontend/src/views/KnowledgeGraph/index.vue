@@ -1,981 +1,1112 @@
 <template>
-  <div class="knowledge-graph-container">
-    <!-- 页面标题和操作 -->
-    <div class="page-header">
-      <div class="page-title">
-        <h2>知识图谱管理</h2>
-        <p>构建和管理课程知识图谱，建立知识点之间的关系</p>
+  <div class="graph-page" :class="{ 'with-detail': selectedNode && !editMode }">
+    <div class="graph-container">
+      <div ref="cyRef" class="graph-canvas"></div>
+      <!-- 搜索框 -->
+      <div class="search-box">
+        <el-autocomplete
+          v-model="searchText"
+          :fetch-suggestions="querySearch"
+          clearable
+          placeholder="搜索知识点"
+          @select="handleSearchSelect"
+        />
       </div>
-      <div class="page-actions">
-        <el-button type="primary" @click="showCreateNodeDialog = true">
-          <el-icon><Plus /></el-icon>
-          添加节点
-        </el-button>
-        <el-button @click="showCreateRelationDialog = true">
-          <el-icon><Link /></el-icon>
-          添加关系
-        </el-button>
-        <el-button @click="toggleVisualization">
-          <el-icon><View /></el-icon>
-          {{ showGraph ? '隐藏图谱' : '显示图谱' }}
-        </el-button>
-      </div>
-    </div>
-    
-    <el-row :gutter="20">
-      <!-- 左侧：节点和关系管理 -->
-      <el-col :span="showGraph ? 12 : 24">
-        <el-row :gutter="20">
-          <!-- 知识节点列表 -->
-          <el-col :span="12">
-            <el-card title="知识节点">
-              <template #header>
-                <div class="card-header">
-                  <span>知识节点</span>
-                  <el-button size="small" @click="showCreateNodeDialog = true">添加</el-button>
-                </div>
-              </template>
-              
-              <div class="search-bar">
-                <el-input
-                  v-model="nodeSearchKeyword"
-                  placeholder="搜索节点..."
-                  clearable
-                  @input="filterNodes"
-                >
-                  <template #prefix>
-                    <el-icon><Search /></el-icon>
-                  </template>
-                </el-input>
-              </div>
-              
-              <div class="node-list">
-                <div 
-                  v-for="node in filteredNodes" 
-                  :key="node.id"
-                  class="node-item"
-                  :class="{ active: selectedNode?.id === node.id }"
-                  @click="selectNode(node)"
-                >
-                  <div class="node-info">
-                    <div class="node-name">{{ node.name }}</div>
-                    <div class="node-meta">
-                      <el-tag :type="getNodeTypeTag(node.node_type)" size="small">
-                        {{ getNodeTypeName(node.node_type) }}
-                      </el-tag>
-                      <span class="node-level">L{{ node.level }}</span>
-                    </div>
-                    <div class="node-desc" v-if="node.description">
-                      {{ node.description }}
-                    </div>
-                  </div>
-                  <div class="node-actions">
-                    <el-button size="small" type="text" @click.stop="editNode(node)">编辑</el-button>
-                    <el-button size="small" type="text" @click.stop="deleteNode(node)">删除</el-button>
-                  </div>
-                </div>
-              </div>
-            </el-card>
-          </el-col>
-          
-          <!-- 关系列表 -->
-          <el-col :span="12">
-            <el-card title="节点关系">
-              <template #header>
-                <div class="card-header">
-                  <span>节点关系</span>
-                  <el-button size="small" @click="showCreateRelationDialog = true">添加</el-button>
-                </div>
-              </template>
-              
-              <div class="relation-list">
-                <div 
-                  v-for="relation in relations" 
-                  :key="relation.id"
-                  class="relation-item"
-                >
-                  <div class="relation-info">
-                    <div class="relation-nodes">
-                      <span class="source-node">{{ getNodeName(relation.source_node_id) }}</span>
-                      <el-icon class="relation-arrow"><Right /></el-icon>
-                      <span class="target-node">{{ getNodeName(relation.target_node_id) }}</span>
-                    </div>
-                    <div class="relation-meta">
-                      <el-tag :type="getRelationTypeTag(relation.relation_type)" size="small">
-                        {{ getRelationTypeName(relation.relation_type) }}
-                      </el-tag>
-                      <span class="relation-weight">权重: {{ relation.weight }}</span>
-                    </div>
-                  </div>
-                  <div class="relation-actions">
-                    <el-button size="small" type="text" @click="deleteRelation(relation)">删除</el-button>
-                  </div>
-                </div>
-              </div>
-            </el-card>
-          </el-col>
-        </el-row>
-      </el-col>
-      
-      <!-- 右侧：图谱可视化 -->
-      <el-col :span="12" v-if="showGraph">
-        <el-card title="知识图谱可视化">
-          <template #header>
-            <div class="card-header">
-              <span>知识图谱可视化</span>
-              <div class="graph-controls">
-                <el-button size="small" @click="resetGraph">重置视图</el-button>
-                <el-button size="small" @click="exportGraph">导出</el-button>
-              </div>
+
+      <!-- 工具栏 -->
+      <template v-if="!editMode">
+        <el-button class="edit-btn" style="right: 164px" @click="layoutAllNodes"
+          >展开所有节点</el-button
+        >
+        <el-button
+          class="edit-btn"
+          style="right: 296px"
+          @click="layoutFirstLevel"
+          >只展开第一层</el-button
+        >
+        <el-button class="edit-btn" @click="enterEditMode"
+          >进入编辑模式</el-button
+        >
+      </template>
+
+      <!-- 编辑模式按钮 -->
+      <template v-if="editMode">
+        <el-button class="edit-btn" @click="saveAndExitEdit"
+          >保存修改并退出</el-button
+        >
+        <el-button class="edit-btn" style="top: 88px" @click="exitEdit"
+          >不保存直接退出</el-button
+        >
+        <el-button class="edit-btn" style="top: 144px" @click="editNode"
+          >编辑</el-button
+        >
+        <el-button class="edit-btn" style="top: 200px" @click="deleteNode"
+          >删除</el-button
+        >
+      </template>
+
+      <!-- 创建课程弹窗 -->
+      <el-dialog
+        v-model="showCourseDialog"
+        title="创建课程"
+        align-center
+        width="400px"
+        :close-on-click-modal="false"
+        :show-close="false"
+      >
+        <el-form :model="courseForm">
+          <el-form-item label="课程名称" required>
+            <el-input v-model="courseForm.name" placeholder="请输入课程名称" />
+          </el-form-item>
+          <el-form-item label="描述">
+            <el-input
+              v-model="courseForm.description"
+              type="textarea"
+              placeholder="可选"
+            />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button type="primary" @click="submitCourseForm">创建</el-button>
+        </template>
+      </el-dialog>
+
+      <!-- 编辑节点弹窗 -->
+      <el-dialog
+        v-model="showEditDialog"
+        title="编辑节点"
+        align-center
+        width="400px"
+      >
+        <el-form :model="editForm">
+          <!-- 名称和描述 -->
+          <el-form-item label="名称">
+            <el-input v-model="editForm.name" />
+          </el-form-item>
+          <el-form-item label="描述">
+            <el-input v-model="editForm.description" type="textarea" />
+          </el-form-item>
+
+          <!-- 父节点选择（autocomplete） -->
+          <el-form-item label="父节点">
+            <el-autocomplete
+              v-model="editForm.parentName"
+              :fetch-suggestions="queryParentNode"
+              placeholder="选择父节点"
+              @select="handleParentSelect"
+              clearable
+            />
+          </el-form-item>
+
+          <!-- 子节点管理 -->
+          <el-form-item label="子节点">
+            <div>
+              <el-tag
+                v-for="child in editForm.childNodes"
+                :key="child.id"
+                closable
+                @close="removeChildNode(child.id)"
+                :disable-transitions="true"
+                style="margin-right: 4px"
+              >
+                {{ child.name }}
+              </el-tag>
+              <el-button
+                size="small"
+                type="primary"
+                @click="showAddChildDialog = true"
+                >新增子节点</el-button
+              >
             </div>
-          </template>
-          
-          <div id="graph-container" class="graph-container"></div>
-        </el-card>
-      </el-col>
-    </el-row>
-    
-    <!-- 创建/编辑节点对话框 -->
-    <el-dialog
-      v-model="showCreateNodeDialog"
-      :title="editingNode ? '编辑节点' : '创建节点'"
-      width="600px"
-    >
-      <el-form
-        ref="nodeFormRef"
-        :model="nodeForm"
-        :rules="nodeRules"
-        label-width="100px"
-      >
-        <el-form-item label="节点名称" prop="name">
-          <el-input v-model="nodeForm.name" placeholder="请输入节点名称" />
-        </el-form-item>
-        
-        <el-form-item label="节点类型" prop="node_type">
-          <el-select v-model="nodeForm.node_type" placeholder="请选择节点类型">
-            <el-option label="概念" value="concept" />
-            <el-option label="技能" value="skill" />
-            <el-option label="资源" value="resource" />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="难度级别" prop="level">
-          <el-input-number v-model="nodeForm.level" :min="1" :max="10" />
-        </el-form-item>
-        
-        <el-form-item label="前置节点">
-          <el-select
-            v-model="nodeForm.prerequisites"
-            multiple
-            placeholder="请选择前置节点"
-            style="width: 100%"
+          </el-form-item>
+
+          <!-- 前置节点选择（autocomplete） -->
+          <el-form-item label="前置节点">
+            <el-autocomplete
+              v-model="editForm.prerequisiteName"
+              :fetch-suggestions="queryPrerequisiteNode"
+              placeholder="选择前置节点"
+              @select="handlePrerequisiteSelect"
+              clearable
+            />
+            <div>
+              <el-tag
+                v-for="pre in editForm.prerequisiteNodes"
+                :key="pre.id"
+                closable
+                @close="removePrerequisiteNode(pre.id)"
+                style="margin-right: 4px"
+              >
+                {{ pre.name }}
+              </el-tag>
+            </div>
+          </el-form-item>
+
+          <!-- 关联资源选择（autocomplete） -->
+          <el-form-item label="关联资源">
+            <el-autocomplete
+              v-model="editForm.resourceName"
+              :fetch-suggestions="queryResourceNode"
+              placeholder="选择资源"
+              @select="handleResourceSelect"
+              clearable
+            />
+            <div>
+              <el-tag
+                v-for="res in editForm.resourceNodes"
+                :key="res.id"
+                closable
+                @close="removeResourceNode(res.id)"
+                style="margin-right: 4px"
+              >
+                {{ res.name }}
+              </el-tag>
+            </div>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="showEditDialog = false">取消</el-button>
+          <el-button type="primary" @click="submitEditNode">保存</el-button>
+        </template>
+      </el-dialog>
+
+      <!-- 新增子节点弹窗 -->
+      <el-dialog v-model="showAddChildDialog" title="新增子节点" width="300px">
+        <el-form>
+          <el-form-item label="名称">
+            <el-input v-model="addChildName" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="handleCancelAddChild">取消</el-button>
+          <el-button
+            type="primary"
+            @click="addChildNodeToEditForm(addChildName)"
+            >添加</el-button
           >
-            <el-option
-              v-for="node in nodes"
-              :key="node.id"
-              :label="node.name"
-              :value="node.id"
-              :disabled="node.id === editingNode?.id"
-            />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="节点描述">
-          <el-input
-            v-model="nodeForm.description"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入节点描述"
-          />
-        </el-form-item>
-      </el-form>
-      
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="showCreateNodeDialog = false">取消</el-button>
-          <el-button type="primary" @click="handleNodeSubmit">保存</el-button>
-        </div>
-      </template>
-    </el-dialog>
-    
-    <!-- 创建关系对话框 -->
-    <el-dialog
-      v-model="showCreateRelationDialog"
-      title="创建关系"
-      width="500px"
-    >
-      <el-form
-        ref="relationFormRef"
-        :model="relationForm"
-        :rules="relationRules"
-        label-width="100px"
-      >
-        <el-form-item label="源节点" prop="source_node_id">
-          <el-select v-model="relationForm.source_node_id" placeholder="请选择源节点" style="width: 100%">
-            <el-option
-              v-for="node in nodes"
-              :key="node.id"
-              :label="node.name"
-              :value="node.id"
-            />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="目标节点" prop="target_node_id">
-          <el-select v-model="relationForm.target_node_id" placeholder="请选择目标节点" style="width: 100%">
-            <el-option
-              v-for="node in nodes"
-              :key="node.id"
-              :label="node.name"
-              :value="node.id"
-            />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="关系类型" prop="relation_type">
-          <el-select v-model="relationForm.relation_type" placeholder="请选择关系类型">
-            <el-option label="依赖关系" value="depends_on" />
-            <el-option label="包含关系" value="contains" />
-            <el-option label="相关关系" value="related_to" />
-            <el-option label="前置关系" value="prerequisite" />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="权重" prop="weight">
-          <el-input-number v-model="relationForm.weight" :min="0.1" :max="2.0" :step="0.1" />
-        </el-form-item>
-      </el-form>
-      
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="showCreateRelationDialog = false">取消</el-button>
-          <el-button type="primary" @click="handleRelationSubmit">保存</el-button>
-        </div>
-      </template>
-    </el-dialog>
+        </template>
+      </el-dialog>
+    </div>
+    <Siderbar v-if="graphStore.selectedNode && !graphStore.editMode" />
+    <!-- <div class="detail-panel" v-if="selectedNode && !editMode">
+      <h3>{{ selectedNode.name }}</h3>
+      <div v-if="selectedNode.category === 'Concept'">
+        <p>掌握度：{{ selectedNode.mastery ?? "-" }}%</p>
+        <p>学习进度：{{ selectedNode.progress ?? "-" }}%</p>
+        <p>难度：{{ selectedNode.difficulty ?? "-" }}</p>
+        <p>描述：{{ selectedNode.description ?? "-" }}</p>
+      </div>
+      <div v-else-if="selectedNode.category === 'Resource'">
+        <p>这是一个资源</p>
+      </div>
+      <div v-else>
+        <p>描述：{{ selectedNode.description ?? "-" }}</p>
+      </div>
+    </div> -->
   </div>
 </template>
 
-<script setup>
-import { ref, reactive, onMounted, computed, nextTick } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Network } from 'vis-network'
-import { DataSet } from 'vis-data'
+<script setup lang="ts">
+import { ref, onMounted, nextTick, watch, computed } from "vue";
+import cytoscape from "cytoscape";
+import type { ConceptNode, KnowledgeLink, KnowledgeNode } from "@/types";
+import { graphAPI } from "../../api";
+import { ElMessage, ElMessageBox } from "element-plus";
 
-// 响应式数据
-const showCreateNodeDialog = ref(false)
-const showCreateRelationDialog = ref(false)
-const showGraph = ref(false)
-const nodeSearchKeyword = ref('')
-const selectedNode = ref(null)
-const editingNode = ref(null)
+import {
+  styles,
+  concentricOptions,
+  createSvgCircleProgress,
+} from "./composable/useCytoscape";
+import { useAnalysisStore } from "../../stores/analysisStore";
+import { useGraphStore } from "../../stores/graphStore";
+import Siderbar from "./Siderbar.vue";
 
-const nodeFormRef = ref()
-const relationFormRef = ref()
+// 状态管理
+const graphStore = useGraphStore();
+// 获取学生学习记录
+const analysisStore = useAnalysisStore();
 
-// 图谱可视化相关
-let network = null
-let nodesDataSet = null
-let edgesDataSet = null
+// 从后端获取的节点和边数据
+const nodes = ref<KnowledgeNode[]>([]);
+const links = ref<KnowledgeLink[]>([]);
 
-// 节点表单
-const nodeForm = reactive({
-  name: '',
-  description: '',
-  node_type: '',
-  level: 1,
-  prerequisites: []
-})
+// 创建课程弹窗相关
+const showCourseDialog = ref(false);
+const courseForm = ref({
+  name: "",
+  description: "",
+});
 
-// 关系表单
-const relationForm = reactive({
-  source_node_id: null,
-  target_node_id: null,
-  relation_type: '',
-  weight: 1.0
-})
+// 画面中的元素
+const elements = ref<cytoscape.ElementDefinition[]>([]);
+// 选中的节点
+const selectedNode = ref<KnowledgeNode | null>(null);
 
-// 表单验证规则
-const nodeRules = {
-  name: [
-    { required: true, message: '请输入节点名称', trigger: 'blur' }
-  ],
-  node_type: [
-    { required: true, message: '请选择节点类型', trigger: 'change' }
-  ],
-  level: [
-    { required: true, message: '请设置难度级别', trigger: 'blur' }
-  ]
-}
+// dom 元素引用
+const cyRef = ref<HTMLDivElement | null>(null);
+// Cytoscape 实例
+let cy: cytoscape.Core | null = null;
 
-const relationRules = {
-  source_node_id: [
-    { required: true, message: '请选择源节点', trigger: 'change' }
-  ],
-  target_node_id: [
-    { required: true, message: '请选择目标节点', trigger: 'change' }
-  ],
-  relation_type: [
-    { required: true, message: '请选择关系类型', trigger: 'change' }
-  ]
-}
+// 手动控制展开节点时的每层节点距离差距
+const radiusDiff = 100;
 
-// 数据
-const nodes = ref([])
-const relations = ref([])
+// 搜索相关
+const searchText = ref("");
+const nodeNames = computed(() =>
+  editMode.value
+    ? editingNodes.value.map((n) => n.name)
+    : nodes.value.map((n) => n.name)
+);
 
-// 过滤后的节点
-const filteredNodes = computed(() => {
-  if (!nodeSearchKeyword.value) return nodes.value
-  return nodes.value.filter(node => 
-    node.name.toLowerCase().includes(nodeSearchKeyword.value.toLowerCase())
-  )
-})
+// 编辑模式
+const editMode = ref(false);
+const editingNodes = ref<KnowledgeNode[]>([]);
+const editingLinks = ref<KnowledgeLink[]>([]);
 
-// 获取节点名称
-const getNodeName = (nodeId) => {
-  const node = nodes.value.find(n => n.id === nodeId)
-  return node ? node.name : '未知节点'
-}
+// 编辑和添加弹窗显示控制
+const showEditDialog = ref(false);
 
-// 获取节点类型名称
-const getNodeTypeName = (type) => {
-  const typeNames = {
-    concept: '概念',
-    skill: '技能',
-    resource: '资源'
-  }
-  return typeNames[type] || type
-}
+const addChildName = ref("");
+const showAddChildDialog = ref(false);
 
-// 获取节点类型标签
-const getNodeTypeTag = (type) => {
-  const typeTags = {
-    concept: 'primary',
-    skill: 'success',
-    resource: 'warning'
-  }
-  return typeTags[type] || ''
-}
+// 编辑和添加表单数据
+const editForm = ref({
+  name: "",
+  description: "",
+  parentName: "",
+  parentId: "",
+  childNodes: [] as KnowledgeNode[],
+  prerequisiteName: "",
+  prerequisiteNodes: [] as KnowledgeNode[],
+  resourceName: "",
+  resourceNodes: [] as KnowledgeNode[],
+});
 
-// 获取关系类型名称
-const getRelationTypeName = (type) => {
-  const typeNames = {
-    depends_on: '依赖',
-    contains: '包含',
-    related_to: '相关',
-    prerequisite: '前置'
-  }
-  return typeNames[type] || type
-}
-
-// 获取关系类型标签
-const getRelationTypeTag = (type) => {
-  const typeTags = {
-    depends_on: 'danger',
-    contains: 'success',
-    related_to: 'info',
-    prerequisite: 'warning'
-  }
-  return typeTags[type] || ''
-}
-
-// 加载数据
-const loadData = async () => {
+// 提交创建课程表单
+async function submitCourseForm() {
   try {
-    // 这里应该调用实际的API
-    // const [nodesResponse, relationsResponse] = await Promise.all([
-    //   getKnowledgeNodes(),
-    //   getKnowledgeRelations()
-    // ])
-    
-    // 模拟数据
-    nodes.value = [
-      {
-        id: 1,
-        name: 'Python基础语法',
-        description: 'Python编程语言的基础语法知识',
-        node_type: 'concept',
-        level: 1,
-        prerequisites: []
-      },
-      {
-        id: 2,
-        name: '变量和数据类型',
-        description: 'Python中的变量定义和基本数据类型',
-        node_type: 'concept',
-        level: 1,
-        prerequisites: [1]
-      },
-      {
-        id: 3,
-        name: '控制流程',
-        description: '条件语句和循环语句的使用',
-        node_type: 'concept',
-        level: 2,
-        prerequisites: [1, 2]
-      },
-      {
-        id: 4,
-        name: '函数定义',
-        description: '如何定义和调用函数',
-        node_type: 'skill',
-        level: 2,
-        prerequisites: [1, 2]
-      },
-      {
-        id: 5,
-        name: '面向对象编程',
-        description: '类和对象的概念及使用',
-        node_type: 'concept',
-        level: 3,
-        prerequisites: [1, 2, 3, 4]
-      }
-    ]
-    
-    relations.value = [
-      {
-        id: 1,
-        source_node_id: 1,
-        target_node_id: 2,
-        relation_type: 'prerequisite',
-        weight: 1.0
-      },
-      {
-        id: 2,
-        source_node_id: 2,
-        target_node_id: 3,
-        relation_type: 'prerequisite',
-        weight: 1.0
-      },
-      {
-        id: 3,
-        source_node_id: 2,
-        target_node_id: 4,
-        relation_type: 'prerequisite',
-        weight: 1.0
-      },
-      {
-        id: 4,
-        source_node_id: 3,
-        target_node_id: 5,
-        relation_type: 'prerequisite',
-        weight: 1.0
-      },
-      {
-        id: 5,
-        source_node_id: 4,
-        target_node_id: 5,
-        relation_type: 'prerequisite',
-        weight: 1.0
-      }
-    ]
-  } catch (error) {
-    ElMessage.error('加载数据失败')
+    // 创建课程节点
+    const courseNode: KnowledgeNode = {
+      id: "node_" + Date.now(),
+      category: "Course",
+      name: courseForm.value.name,
+      description: courseForm.value.description,
+      depth: 0,
+    };
+    await graphAPI.createNode(courseNode);
+    // 刷新数据
+    const data = await graphAPI.fetchKnowledgeGraph();
+    nodes.value = data.nodes;
+    links.value = data.links;
+    showCourseDialog.value = false;
+    elements.value = calcElements();
+    await nextTick();
+    renderCytoscape();
+    ElMessage.success("课程创建成功！");
+  } catch (e) {
+    ElMessage.error("课程创建失败，请重试！");
   }
 }
 
-// 初始化图谱可视化
-const initGraph = () => {
-  const container = document.getElementById('graph-container')
-  if (!container) return
-  
-  // 准备数据
-  const nodesData = nodes.value.map(node => ({
-    id: node.id,
-    label: node.name,
-    group: node.node_type,
-    level: node.level,
-    title: `${node.name}\n类型: ${getNodeTypeName(node.node_type)}\n级别: ${node.level}\n描述: ${node.description || '无'}`
-  }))
-  
-  const edgesData = relations.value.map(relation => ({
-    id: relation.id,
-    from: relation.source_node_id,
-    to: relation.target_node_id,
-    label: getRelationTypeName(relation.relation_type),
-    width: relation.weight * 2,
-    title: `${getNodeName(relation.source_node_id)} → ${getNodeName(relation.target_node_id)}\n类型: ${getRelationTypeName(relation.relation_type)}\n权重: ${relation.weight}`
-  }))
-  
-  // 创建数据集
-  nodesDataSet = new DataSet(nodesData)
-  edgesDataSet = new DataSet(edgesData)
-  
-  // 配置选项
-  const options = {
-    nodes: {
-      shape: 'box',
-      font: {
-        size: 14
-      },
-      borderWidth: 2,
-      shadow: true
-    },
-    edges: {
-      font: {
-        size: 12
-      },
-      arrows: {
-        to: {
-          enabled: true,
-          scaleFactor: 1
-        }
-      },
-      smooth: {
-        type: 'continuous'
-      }
-    },
-    groups: {
-      concept: {
-        color: {
-          background: '#e1f5fe',
-          border: '#01579b'
-        }
-      },
-      skill: {
-        color: {
-          background: '#e8f5e8',
-          border: '#2e7d32'
-        }
-      },
-      resource: {
-        color: {
-          background: '#fff3e0',
-          border: '#ef6c00'
-        }
-      }
-    },
-    physics: {
-      enabled: true,
-      stabilization: {
-        iterations: 100
-      }
-    },
-    interaction: {
-      hover: true,
-      selectConnectedEdges: false
+// cytoscape 相关
+function calcElements(layoutMode: string = "all") {
+  const nodeList = editMode.value ? editingNodes.value : nodes.value;
+  const linkList = editMode.value ? editingLinks.value : links.value;
+
+  let showNodes: KnowledgeNode[] = [];
+  let showLinks: KnowledgeLink[] = [];
+
+  if (layoutMode === "all") {
+    showNodes = nodeList.map((n) => ({ ...n, expanded: true }));
+    showLinks = linkList;
+  } else if (layoutMode === "first") {
+    const root = nodeList.find((n) => n.category === "Course");
+    if (root) {
+      showNodes = [root];
+      showLinks = linkList.filter(
+        (l) => l.source === root.id && l.relation === "包含"
+      );
+      showNodes.push(
+        ...nodeList
+          .filter((n) => showLinks.some((l) => l.target === n.id))
+          .map((n) => ({ ...n, expanded: false }))
+      );
     }
   }
-  
-  // 创建网络
-  network = new Network(container, { nodes: nodesDataSet, edges: edgesDataSet }, options)
-  
-  // 添加事件监听
-  network.on('selectNode', (params) => {
-    if (params.nodes.length > 0) {
-      const nodeId = params.nodes[0]
-      const node = nodes.value.find(n => n.id === nodeId)
+
+  return [
+    ...showNodes.map((n) => ({
+      data: {
+        ...n,
+        img:
+          n.category === "Concept"
+            ? createSvgCircleProgress(
+                (n as ConceptNode).progress ?? 0,
+                n.depth <= 4 ? 40 - n.depth * 5 : 20
+              )
+            : n.category === "Resource"
+            ? "/assets/resource_icon.svg"
+            : "/assets/course_icon.svg",
+      },
+    })),
+    ...showLinks.map((l) => ({
+      data: {
+        id: `${l.source}_${l.target}`,
+        ...l,
+      },
+    })),
+  ];
+}
+
+function expandNodes(parentId: string) {
+  if (!cy) return;
+
+  // 1. 找出所有“包含”子节点
+  const childLinks = links.value.filter(
+    (l) => l.source === parentId && l.relation === "包含"
+  );
+  const childNodeIds = childLinks.map((l) => l.target);
+  if (childNodeIds.length === 0) return;
+
+  // 2. 计算位置
+  // 获取根节点和父节点位置，根节点的category为Course
+  const rootPos = cy
+    .nodes()
+    .filter((n) => n.data("category") === "Course")
+    .position();
+  const parentPos = cy
+    .nodes()
+    .filter((n) => n.data("id") === parentId)
+    .position();
+  // 计算当前层节点总数（与parentId同层的节点数，也就是与父节点的depth相同的节点数）
+  const parentNode = nodes.value.find((pn) => pn.id === parentId);
+  const parentDepth =
+    parentNode && "depth" in parentNode ? parentNode.depth : undefined;
+  const layerNodeCount = nodes.value.filter(
+    (n) => "depth" in n && n.depth === parentDepth
+  ).length;
+  const childPositions = calcChildPositions(
+    rootPos,
+    parentPos,
+    childNodeIds.length,
+    layerNodeCount
+  );
+
+  // 3. 添加子节点
+  childNodeIds.forEach((id, idx) => {
+    if (!cy?.getElementById(id).length) {
+      const node = nodes.value.find((n) => n.id === id);
       if (node) {
-        selectNode(node)
+        if (node.category === "Concept") {
+          node.progress = analysisStore.getProgressByKnowledgeId(node.id) * 100;
+          node.mastery = analysisStore.getMasteryByKnowledgeId(node.id) * 100;
+        }
+        cy?.add({
+          group: "nodes",
+          data: {
+            ...node,
+            expanded: false,
+            img: createSvgCircleProgress(
+              (node as ConceptNode).progress ?? 0,
+              (node as ConceptNode).depth <= 4
+                ? 40 - (node as ConceptNode).depth * 5
+                : 20
+            ),
+          },
+          position: childPositions[idx],
+        });
       }
     }
-  })
-}
+  });
 
-// 切换可视化
-const toggleVisualization = () => {
-  showGraph.value = !showGraph.value
-  if (showGraph.value) {
-    nextTick(() => {
-      initGraph()
-    })
-  }
-}
-
-// 重置图谱
-const resetGraph = () => {
-  if (network) {
-    network.fit()
-  }
-}
-
-// 导出图谱
-const exportGraph = () => {
-  if (network) {
-    const canvas = document.querySelector('#graph-container canvas')
-    if (canvas) {
-      const link = document.createElement('a')
-      link.download = 'knowledge-graph.png'
-      link.href = canvas.toDataURL()
-      link.click()
-    }
-  }
-}
-
-// 选择节点
-const selectNode = (node) => {
-  selectedNode.value = node
-  if (network) {
-    network.selectNodes([node.id])
-    network.focus(node.id, {
-      scale: 1.2,
-      animation: true
-    })
-  }
-}
-
-// 过滤节点
-const filterNodes = () => {
-  // 过滤逻辑已在computed中实现
-}
-
-// 创建节点
-const handleNodeSubmit = async () => {
-  if (!nodeFormRef.value) return
-  
-  await nodeFormRef.value.validate(async (valid) => {
-    if (valid) {
-      try {
-        if (editingNode.value) {
-          // 编辑节点
-          const index = nodes.value.findIndex(n => n.id === editingNode.value.id)
-          if (index !== -1) {
-            nodes.value[index] = { ...nodes.value[index], ...nodeForm }
-          }
-          ElMessage.success('节点更新成功')
-        } else {
-          // 创建节点
-          const newNode = {
-            id: Date.now(), // 临时ID
-            ...nodeForm
-          }
-          nodes.value.push(newNode)
-          ElMessage.success('节点创建成功')
-        }
-        
-        showCreateNodeDialog.value = false
-        resetNodeForm()
-        
-        // 如果图谱已显示，重新初始化
-        if (showGraph.value) {
-          nextTick(() => {
-            initGraph()
-          })
-        }
-      } catch (error) {
-        ElMessage.error('操作失败')
+  // 4. 添加相关边（包含和前置）
+  links.value.forEach((link) => {
+    if (
+      (childNodeIds.includes(link.source) && link.relation === "前置") ||
+      childNodeIds.includes(link.target)
+    ) {
+      const edgeId = `${link.source}_${link.target}`;
+      if (!cy?.getElementById(edgeId).length) {
+        cy?.add({
+          group: "edges",
+          data: { ...link, id: edgeId },
+        });
       }
     }
-  })
+  });
 }
 
-// 编辑节点
-const editNode = (node) => {
-  editingNode.value = node
-  Object.assign(nodeForm, {
-    name: node.name,
-    description: node.description || '',
-    node_type: node.node_type,
-    level: node.level,
-    prerequisites: node.prerequisites || []
-  })
-  showCreateNodeDialog.value = true
+function calcChildPositions(
+  rootPos: { x: number; y: number },
+  parentPos: { x: number; y: number },
+  childCount: number,
+  layerNodeCount: number
+) {
+  const positions = [];
+
+  // 计算 rootPos 到 parentPos 的夹角（弧度）
+  const dx = parentPos.x - rootPos.x;
+  const dy = parentPos.y - rootPos.y;
+  const centerAngle = Math.atan2(dy, dx); // [-π, π]
+
+  // 子节点均分的扇区角度（弧度）
+  const sectorAngle = Math.PI / 3;
+
+  // 每个子节点夹角（弧度）
+  const angleStep = sectorAngle / childCount;
+
+  // 起始角度，使子节点们居中分布在 centerAngle 附近
+  const startAngle = centerAngle - (angleStep * (childCount - 1)) / 2;
+
+  // 半径
+  const radius = radiusDiff; // 可调整
+
+  for (let i = 0; i < childCount; i++) {
+    const angle = startAngle + i * angleStep;
+    positions.push({
+      x: parentPos.x + radius * Math.cos(angle),
+      y: parentPos.y + radius * Math.sin(angle),
+    });
+  }
+  return positions;
 }
 
-// 删除节点
-const deleteNode = async (node) => {
+function collapseNodes(parentId: string) {
+  if (!cy) return;
+  // 找出所有直接子节点
+  const childLinks = links.value.filter(
+    (l) => l.source === parentId && l.relation === "包含"
+  );
+  const childNodeIds = childLinks.map((l) => l.target);
+
+  childNodeIds.forEach((id) => {
+    // 递归移除该子节点的所有后代
+    collapseNodes(id);
+    // 移除当前子节点
+    const node = cy?.getElementById(id);
+    if (node && node.length) {
+      cy?.remove(node);
+    }
+  });
+}
+
+function layoutAllNodes() {
+  if (!cy) return;
+  elements.value = calcElements("all");
+  cy.json({ elements: elements.value });
+  cy.layout(concentricOptions).run();
+}
+
+function layoutFirstLevel() {
+  if (!cy) return;
+  const currentZoom = cy.zoom();
+  elements.value = calcElements("first");
+  cy.json({ elements: elements.value });
+  cy.layout(concentricOptions).run();
+  //cy.zoom(currentZoom*1.2);
+  cy.center();
+}
+
+// 自动补全建议
+function querySearch(queryString: string, cb: (results: any[]) => void) {
+  const results = nodeNames.value
+    .filter((name) => name.toLowerCase().includes(queryString.toLowerCase()))
+    .map((name) => ({ value: name }));
+  cb(results);
+}
+
+// 选中建议时的处理
+async function handleSearchSelect(item: { value: string }) {
+  const node = nodes.value.find((n) => n.name === item.value);
+  if (!node) return;
+
+  // 如果节点已在 Cytoscape 实例里
+  const cyNode = cy?.getElementById(node.id);
+  if (cyNode && cyNode.length) {
+    // 展开该节点
+    if (!editMode.value && node.category === "Concept") {
+      collapseNodes(node.id);
+      expandNodes(node.id);
+      cyNode.data("expanded", true);
+    }
+    // 清空之前的选中状态
+    cy?.nodes().unselect();
+    cyNode.select();
+    selectedNode.value = { ...node };
+    nextTick().then(() => {
+      cy?.animate({ center: { eles: cyNode } }, { duration: 400 });
+    });
+  } else {
+    // 节点不在画布上，递归展开
+    expandToNode(node.id);
+  }
+}
+
+// 递归展开到目标节点
+function expandToNode(targetId: string) {
+  // 1. 构造从根到目标节点的路径
+  const path: string[] = [];
+  let currentId: string | null = targetId;
+  while (currentId) {
+    path.unshift(currentId);
+    const parentLink = links.value.find(
+      (l) => l.target === currentId && l.relation === "包含"
+    );
+    currentId = parentLink ? parentLink.source : null;
+  }
+
+  // 2. 找到路径中最后一个已经在 Cytoscape 实例里的节点
+  let startIdx = 0;
+  for (; startIdx < path.length; startIdx++) {
+    if (!cy?.getElementById(path[startIdx]!).length) {
+      break;
+    }
+  }
+  startIdx--; // 回退到最后一个已存在节点
+
+  // 3. 从最后一个已存在节点开始依次展开
+  for (let i = startIdx; i < path.length; i++) {
+    expandNodes(path[i]!);
+    cy?.getElementById(path[i]!).data("expanded", true);
+  }
+
+  // 4. 选中目标节点并居中
+  const targetNode = cy?.getElementById(targetId);
+  if (targetNode && targetNode.length) {
+    // 清空之前的选中状态
+    cy?.nodes().unselect();
+    targetNode.select();
+    selectedNode.value = { ...targetNode.data() } as KnowledgeNode;
+    nextTick().then(() => {
+      cy?.animate({ center: { eles: targetNode } }, { duration: 400 });
+    });
+  }
+}
+
+async function enterEditMode() {
+  editMode.value = true;
+  selectedNode.value = null; // 进入编辑模式时清空选中节点
+
+  graphStore.unSelectNode();
+  graphStore.enterEditMode();
+
+  editingNodes.value = JSON.parse(JSON.stringify(nodes.value));
+  editingLinks.value = JSON.parse(JSON.stringify(links.value));
+  elements.value = calcElements();
+  await nextTick();
+  renderCytoscape();
+  if (cy) {
+    cy.autoungrabify(true); // 禁止节点拖拽
+  }
+}
+
+async function saveAndExitEdit() {
   try {
-    await ElMessageBox.confirm('确定要删除这个节点吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    
-    // 检查是否有相关关系
-    const relatedRelations = relations.value.filter(r => 
-      r.source_node_id === node.id || r.target_node_id === node.id
+    // 提交到后端
+    await graphAPI.updateKnowledgeGraph(editingNodes.value, editingLinks.value);
+    // 本地同步
+    nodes.value = JSON.parse(JSON.stringify(editingNodes.value));
+    links.value = JSON.parse(JSON.stringify(editingLinks.value));
+    editMode.value = false;
+    selectedNode.value = null;
+
+    graphStore.unSelectNode();
+    graphStore.exitEditMode(true);
+
+    if (cy) {
+      cy.autoungrabify(false);
+    }
+    layoutAllNodes();
+    ElMessage.success("保存成功！");
+  } catch (e) {
+    ElMessage.error("保存失败，请重试！");
+  }
+}
+
+function exitEdit() {
+  editingNodes.value = [];
+  editingLinks.value = [];
+  editMode.value = false;
+  selectedNode.value = null; // 退出编辑模式时清空选中节点
+
+  graphStore.unSelectNode();
+  graphStore.exitEditMode();
+  if (cy) {
+    cy.autoungrabify(false);
+  }
+  layoutAllNodes();
+}
+
+function editNode() {
+  if (!selectedNode.value) {
+    ElMessage.warning("请先选中节点");
+    return;
+  }
+
+  // 名称和描述
+  editForm.value.name = selectedNode.value.name ?? "";
+  editForm.value.description = selectedNode.value.description ?? "";
+
+  // 父节点
+  const parentLink = editingLinks.value.find(
+    (l) => l.target === selectedNode.value!.id && l.relation === "包含"
+  );
+  if (parentLink) {
+    const parentNode = editingNodes.value.find(
+      (n) => n.id === parentLink.source
+    );
+    editForm.value.parentName = parentNode?.name ?? "";
+    editForm.value.parentId = parentNode?.id ?? "";
+  } else {
+    editForm.value.parentName = "";
+    editForm.value.parentId = "";
+  }
+
+  // 子节点
+  const childLinks = editingLinks.value.filter(
+    (l) => l.source === selectedNode.value!.id && l.relation === "包含"
+  );
+  editForm.value.childNodes = childLinks
+    .map((l) => editingNodes.value.find((n) => n.id === l.target))
+    .filter(Boolean) as KnowledgeNode[];
+
+  // 前置节点
+  const preLinks = editingLinks.value.filter(
+    (l) => l.target === selectedNode.value!.id && l.relation === "前置"
+  );
+  editForm.value.prerequisiteNodes = preLinks
+    .map((l) => editingNodes.value.find((n) => n.id === l.source))
+    .filter(Boolean) as KnowledgeNode[];
+  editForm.value.prerequisiteName = "";
+
+  // 关联资源
+  const resLinks = editingLinks.value.filter(
+    (l) => l.source === selectedNode.value!.id && l.relation === "关联"
+  );
+  editForm.value.resourceNodes = resLinks
+    .map((l) => editingNodes.value.find((n) => n.id === l.target))
+    .filter(Boolean) as KnowledgeNode[];
+  editForm.value.resourceName = "";
+
+  showEditDialog.value = true;
+}
+
+// 自动补全编辑窗口中的父节点选择
+function queryParentNode(query: string, cb: (results: any[]) => void) {
+  const list = editingNodes.value
+    .filter(
+      (n) =>
+        (n.category === "Course" || n.category === "Concept") &&
+        n.id !== selectedNode.value?.id
     )
-    
-    if (relatedRelations.length > 0) {
-      ElMessage.warning('该节点存在关联关系，请先删除相关关系')
-      return
-    }
-    
-    const index = nodes.value.findIndex(n => n.id === node.id)
-    if (index !== -1) {
-      nodes.value.splice(index, 1)
-      ElMessage.success('节点删除成功')
-      
-      // 如果图谱已显示，重新初始化
-      if (showGraph.value) {
-        nextTick(() => {
-          initGraph()
-        })
-      }
-    }
-  } catch (error) {
-    // 用户取消
+    .filter((n) => n.name.includes(query))
+    .map((n) => ({ value: n.name, id: n.id }));
+  cb(list);
+}
+// 处理父节点选择
+function handleParentSelect(item: { value: string; id: string }) {
+  editForm.value.parentName = item.value;
+  editForm.value.parentId = item.id;
+}
+// 自动补全编辑窗口中前置节点选择
+function queryPrerequisiteNode(query: string, cb: (results: any[]) => void) {
+  const list = editingNodes.value
+    .filter((n) => n.category === "Concept" && n.id !== selectedNode.value?.id)
+    .filter((n) => n.name.includes(query))
+    .map((n) => ({ value: n.name, id: n.id }));
+  cb(list);
+}
+// 处理前置节点选择
+function handlePrerequisiteSelect(item: { value: string; id: string }) {
+  if (!editForm.value.prerequisiteNodes.some((n) => n.id === item.id)) {
+    const node = editingNodes.value.find((n) => n.id === item.id);
+    if (node) editForm.value.prerequisiteNodes.push(node);
   }
+  editForm.value.prerequisiteName = "";
+}
+// 移除前置节点
+function removePrerequisiteNode(id: string) {
+  editForm.value.prerequisiteNodes = editForm.value.prerequisiteNodes.filter(
+    (n) => n.id !== id
+  );
 }
 
-// 创建关系
-const handleRelationSubmit = async () => {
-  if (!relationFormRef.value) return
-  
-  await relationFormRef.value.validate(async (valid) => {
-    if (valid) {
-      if (relationForm.source_node_id === relationForm.target_node_id) {
-        ElMessage.error('源节点和目标节点不能相同')
-        return
-      }
-      
-      // 检查关系是否已存在
-      const existingRelation = relations.value.find(r => 
-        r.source_node_id === relationForm.source_node_id &&
-        r.target_node_id === relationForm.target_node_id &&
-        r.relation_type === relationForm.relation_type
-      )
-      
-      if (existingRelation) {
-        ElMessage.error('该关系已存在')
-        return
-      }
-      
-      try {
-        const newRelation = {
-          id: Date.now(), // 临时ID
-          ...relationForm
-        }
-        relations.value.push(newRelation)
-        ElMessage.success('关系创建成功')
-        
-        showCreateRelationDialog.value = false
-        resetRelationForm()
-        
-        // 如果图谱已显示，重新初始化
-        if (showGraph.value) {
-          nextTick(() => {
-            initGraph()
-          })
-        }
-      } catch (error) {
-        ElMessage.error('创建失败')
-      }
+function queryResourceNode(query: string, cb: (results: any[]) => void) {
+  const list = editingNodes.value
+    .filter((n) => n.category === "Resource")
+    .filter((n) => n.name.includes(query))
+    .map((n) => ({ value: n.name, id: n.id }));
+  cb(list);
+}
+function handleResourceSelect(item: { value: string; id: string }) {
+  if (!editForm.value.resourceNodes.some((n) => n.id === item.id)) {
+    const node = editingNodes.value.find((n) => n.id === item.id);
+    if (node) editForm.value.resourceNodes.push(node);
+  }
+  editForm.value.resourceName = "";
+}
+function removeResourceNode(id: string) {
+  editForm.value.resourceNodes = editForm.value.resourceNodes.filter(
+    (n) => n.id !== id
+  );
+}
+
+// 子节点管理
+function removeChildNode(id: string) {
+  editForm.value.childNodes = editForm.value.childNodes.filter(
+    (n) => n.id !== id
+  );
+}
+function handleCancelAddChild() {
+  showAddChildDialog.value = false;
+  addChildName.value = ""; // 取消时也清空输入框
+}
+function addChildNodeToEditForm(name: string) {
+  const newId = "node_" + Date.now();
+  const parentDepth =
+    selectedNode.value &&
+    "depth" in selectedNode.value &&
+    typeof selectedNode.value.depth === "number"
+      ? selectedNode.value.depth
+      : 1;
+  const newNode: KnowledgeNode = {
+    id: newId,
+    name,
+    category: "Concept",
+    depth: parentDepth + 1,
+    description: "",
+  };
+  editForm.value.childNodes.push(newNode);
+  showAddChildDialog.value = false;
+  addChildName.value = "";
+}
+
+async function submitEditNode() {
+  const nodeId = selectedNode.value?.id;
+  if (!nodeId) return;
+
+  // 1. 修改节点基本信息
+  const idx = editingNodes.value.findIndex((n) => n.id === nodeId);
+  if (idx !== -1) {
+    editingNodes.value[idx]!.name = editForm.value.name;
+    editingNodes.value[idx]!.description = editForm.value.description;
+  }
+
+  // 2. 父节点关系（只允许一个父节点，“包含”关系）
+  // 先移除原有父节点的“包含”边
+  editingLinks.value = editingLinks.value.filter(
+    (l) => !(l.target === nodeId && l.relation === "包含")
+  );
+  // 添加新的父节点边（如果有选择）
+  if (editForm.value.parentId) {
+    editingLinks.value.push({
+      source: editForm.value.parentId,
+      target: nodeId,
+      relation: "包含",
+    });
+  }
+
+  // 3. 子节点关系（全部替换为当前表单中的子节点，“包含”关系）
+  // 先移除原有所有子节点的“包含”边，并递归删除这些子节点及其后代
+  const oldChildLinks = editingLinks.value.filter(
+    (l) => l.source === nodeId && l.relation === "包含"
+  );
+  const toDeleteIds: string[] = [];
+  function collectDescendants(id: string) {
+    toDeleteIds.push(id);
+    editingLinks.value
+      .filter((l) => l.source === id && l.relation === "包含")
+      .forEach((l) => collectDescendants(l.target));
+  }
+  // 找出被移除的子节点（不在新 childNodes 列表里的）
+  oldChildLinks.forEach((l) => {
+    if (!editForm.value.childNodes.some((child) => child.id === l.target)) {
+      collectDescendants(l.target);
     }
-  })
+  });
+  // 删除这些节点和相关边
+  editingNodes.value = editingNodes.value.filter(
+    (n) => !toDeleteIds.includes(n.id)
+  );
+  editingLinks.value = editingLinks.value.filter(
+    (l) => !toDeleteIds.includes(l.source) && !toDeleteIds.includes(l.target)
+  );
+  // 再添加新的子节点边
+  editForm.value.childNodes.forEach((child) => {
+    if (!editingNodes.value.find((n) => n.id === child.id)) {
+      editingNodes.value.push(child);
+    }
+    editingLinks.value.push({
+      source: nodeId,
+      target: child.id,
+      relation: "包含",
+    });
+  });
+
+  // 4. 前置节点关系（全部替换为当前表单中的前置节点，“前置”关系）
+  editingLinks.value = editingLinks.value.filter(
+    (l) => !(l.target === nodeId && l.relation === "前置")
+  );
+  editForm.value.prerequisiteNodes.forEach((pre) => {
+    editingLinks.value.push({
+      source: pre.id,
+      target: nodeId,
+      relation: "前置",
+    });
+  });
+
+  // 5. 关联资源关系（全部替换为当前表单中的资源，“关联”关系）
+  editingLinks.value = editingLinks.value.filter(
+    (l) => !(l.source === nodeId && l.relation === "关联")
+  );
+  editForm.value.resourceNodes.forEach((res) => {
+    editingLinks.value.push({
+      source: nodeId,
+      target: res.id,
+      relation: "关联",
+    });
+  });
+
+  showEditDialog.value = false;
+  ElMessage.success("修改成功");
+  elements.value = calcElements();
+  await nextTick();
+  renderCytoscape();
 }
 
-// 删除关系
-const deleteRelation = async (relation) => {
-  try {
-    await ElMessageBox.confirm('确定要删除这个关系吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
+function deleteNode() {
+  if (!selectedNode.value) {
+    ElMessage.warning("请先选中节点");
+    return;
+  }
+  ElMessageBox.confirm(
+    "你确定要删除该节点吗？删除该节点将同步删除其所有子节点。",
+    "删除确认",
+    {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+    }
+  )
+    .then(() => {
+      // 删除节点及其所有子节点
+      const toDeleteIds: string[] = [];
+      function collectDescendants(id: string) {
+        toDeleteIds.push(id);
+        editingLinks.value
+          .filter((l) => l.source === id && l.relation === "包含")
+          .forEach((l) => collectDescendants(l.target));
+      }
+      collectDescendants(selectedNode.value!.id);
+
+      // 删除节点
+      editingNodes.value = editingNodes.value.filter(
+        (n) => !toDeleteIds.includes(n.id)
+      );
+      // 删除相关边
+      editingLinks.value = editingLinks.value.filter(
+        (l) =>
+          !toDeleteIds.includes(l.source) && !toDeleteIds.includes(l.target)
+      );
+
+      selectedNode.value = null;
+      ElMessage.success("删除成功");
+      layoutAllNodes();
     })
-    
-    const index = relations.value.findIndex(r => r.id === relation.id)
-    if (index !== -1) {
-      relations.value.splice(index, 1)
-      ElMessage.success('关系删除成功')
-      
-      // 如果图谱已显示，重新初始化
-      if (showGraph.value) {
-        nextTick(() => {
-          initGraph()
-        })
+    .catch(() => {
+      // 用户取消，无操作
+    });
+}
+
+function highlightNodeAndRelated(node: cytoscape.NodeSingular) {
+  cy?.nodes().removeClass("highlight");
+  cy?.nodes().removeClass("fade");
+  node.addClass("highlight");
+  node.connectedEdges().addClass("highlight");
+  node.connectedEdges().connectedNodes().addClass("highlight");
+  cy?.nodes().not(".highlight").addClass("fade");
+}
+
+function renderCytoscape() {
+  if (!cyRef.value) return;
+  // 初始化 Cytoscape
+  cy = cytoscape({
+    container: cyRef.value,
+    elements: elements.value,
+    style: styles,
+    layout: concentricOptions,
+    boxSelectionEnabled: false,
+    autoungrabify: false,
+  });
+
+  // 节点点击事件
+  cy.on("tap", "node", async (evt) => {
+    // 选中节点
+    const nodeData = evt.target.data();
+    graphStore.selectNode(nodeData.id);
+
+    // 给选中节点及其相关节点添加高亮，其他节点淡出
+    highlightNodeAndRelated(evt.target);
+
+    // 如果当前选中节点不是它，直接选中并展开
+    if (!selectedNode.value || selectedNode.value.id !== nodeData.id) {
+      selectedNode.value = { ...nodeData };
+      await nextTick();
+      cy?.animate({ center: { eles: evt.target } }, { duration: 400 });
+      // 默认展开
+      if (
+        !editMode.value &&
+        nodeData.category === "Concept" &&
+        !nodeData.expanded
+      ) {
+        expandNodes(nodeData.id);
+        evt.target.data("expanded", true);
+      }
+      return;
+    }
+
+    // 如果已经选中，再触发展开/收起逻辑
+    if (!editMode.value && nodeData.category === "Concept") {
+      const isExpanded = nodeData.expanded;
+      if (isExpanded) {
+        collapseNodes(nodeData.id);
+        evt.target.data("expanded", false);
+      } else {
+        expandNodes(nodeData.id);
+        evt.target.data("expanded", true);
       }
     }
-  } catch (error) {
-    // 用户取消
+  });
+
+  // 点击空白关闭详情
+  cy.on("tap", (evt) => {
+    if (evt.target === cy) {
+      selectedNode.value = null;
+      graphStore.unSelectNode();
+      // 移除高亮和淡出效果
+      cy?.nodes().removeClass("highlight");
+      cy?.nodes().removeClass("fade");
+    }
+  });
+  cy.on("select", "edge", (evt) => {
+    evt.target.unselect();
+  });
+  cy.on("mouseover", "node", (evt) => {
+    const node = evt.target;
+    const percent = node.data("progress") ?? 0;
+    node.data(
+      "img",
+      createSvgCircleProgress(
+        percent,
+        node.data("depth") <= 4 ? 40 - node.data("depth") * 5 : 20,
+        true,
+        node.data("mastery") ?? 0
+      )
+    );
+    node.addClass("hover");
+  });
+
+  cy.on("mouseout", "node", (evt) => {
+    const node = evt.target;
+    const percent = node.data("progress") ?? 0;
+    node.data(
+      "img",
+      createSvgCircleProgress(
+        percent,
+        node.data("depth") <= 4 ? 40 - node.data("depth") * 5 : 20,
+        false
+      )
+    );
+    node.removeClass("hover");
+  });
+  // 保证缩放比例不太大
+  if (cy.zoom() > 3) {
+    cy.zoom(3);
+    cy.center();
   }
 }
 
-// 重置表单
-const resetNodeForm = () => {
-  Object.assign(nodeForm, {
-    name: '',
-    description: '',
-    node_type: '',
-    level: 1,
-    prerequisites: []
-  })
-  editingNode.value = null
-  nodeFormRef.value?.resetFields()
-}
+onMounted(async () => {
+  const data = await graphAPI.fetchKnowledgeGraph();
+  console.log("Fetched graph data:", data);
+  nodes.value = data.nodes;
+  links.value = data.links;
 
-const resetRelationForm = () => {
-  Object.assign(relationForm, {
-    source_node_id: null,
-    target_node_id: null,
-    relation_type: '',
-    weight: 1.0
-  })
-  relationFormRef.value?.resetFields()
-}
+  // 检查是否有根节点
+  const hasCourseNode = nodes.value.some((n) => n.category === "Course");
+  if (!nodes.value.length || !hasCourseNode) {
+    showCourseDialog.value = true;
+    return;
+  }
 
-onMounted(() => {
-  loadData()
-})
+  // 为每个非根节点赋值 progress 和 mastery
+  nodes.value.forEach((n) => {
+    if (n.category === "Concept") {
+      (n as ConceptNode).progress =
+        analysisStore.getProgressByKnowledgeId(n.id) * 100;
+      (n as ConceptNode).mastery =
+        analysisStore.getMasteryByKnowledgeId(n.id) * 100;
+    }
+  });
+
+  elements.value = calcElements();
+  await nextTick();
+  renderCytoscape();
+});
+
+watch(selectedNode, () => {
+  // 侧边栏出现或关闭时，强制 Cytoscape 重新适应容器
+  if (cy) {
+    cy.resize();
+  }
+});
 </script>
 
-<style lang="scss" scoped>
-.knowledge-graph-container {
-  padding: 20px;
+<style scoped>
+.graph-page {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
 }
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  
-  .page-title {
-    h2 {
-      margin: 0 0 8px 0;
-      color: #333;
-    }
-    
-    p {
-      margin: 0;
-      color: #666;
-      font-size: 14px;
-    }
-  }
-  
-  .page-actions {
-    display: flex;
-    gap: 12px;
-  }
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.search-bar {
-  margin-bottom: 16px;
-}
-
-.node-list {
-  max-height: 400px;
-  overflow-y: auto;
-  
-  .node-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px;
-    border: 1px solid #e4e7ed;
-    border-radius: 6px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    transition: all 0.3s;
-    
-    &:hover {
-      border-color: #409eff;
-      background-color: #f0f9ff;
-    }
-    
-    &.active {
-      border-color: #409eff;
-      background-color: #e6f7ff;
-    }
-    
-    .node-info {
-      flex: 1;
-      
-      .node-name {
-        font-weight: 500;
-        color: #333;
-        margin-bottom: 4px;
-      }
-      
-      .node-meta {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 4px;
-        
-        .node-level {
-          font-size: 12px;
-          color: #666;
-        }
-      }
-      
-      .node-desc {
-        font-size: 12px;
-        color: #666;
-        line-height: 1.4;
-      }
-    }
-    
-    .node-actions {
-      display: flex;
-      gap: 4px;
-    }
-  }
-}
-
-.relation-list {
-  max-height: 400px;
-  overflow-y: auto;
-  
-  .relation-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px;
-    border: 1px solid #e4e7ed;
-    border-radius: 6px;
-    margin-bottom: 8px;
-    
-    .relation-info {
-      flex: 1;
-      
-      .relation-nodes {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 4px;
-        
-        .relation-arrow {
-          color: #409eff;
-        }
-        
-        .source-node,
-        .target-node {
-          font-size: 14px;
-          color: #333;
-        }
-      }
-      
-      .relation-meta {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        
-        .relation-weight {
-          font-size: 12px;
-          color: #666;
-        }
-      }
-    }
-    
-    .relation-actions {
-      display: flex;
-      gap: 4px;
-    }
-  }
-}
-
 .graph-container {
-  height: 500px;
-  border: 1px solid #e4e7ed;
-  border-radius: 6px;
+  position: relative;
+  height: 100%;
+  width: 100%;
+  background: #fff;
+  min-width: 0;
+  box-sizing: border-box;
 }
-
-.graph-controls {
-  display: flex;
-  gap: 8px;
+.graph-page.with-detail .graph-container {
+  width: 70%;
 }
-
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
+.detail-panel {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 30%;
+  background: #f7f7f7;
+  padding: 24px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  z-index: 20;
+}
+.graph-canvas {
+  width: 100%;
+  height: 100%;
+}
+.edit-btn {
+  position: absolute;
+  right: 32px;
+  top: 32px;
+  z-index: 20;
+}
+.search-box {
+  position: absolute;
+  left: 32px;
+  top: 32px;
+  z-index: 30;
+  width: 240px;
 }
 </style>

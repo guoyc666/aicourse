@@ -1,0 +1,68 @@
+{
+  "course": "大数据分析",
+  "nodes": [
+    {
+      "id": "root",
+      "name": "大数据分析",
+      "category": "Course",
+      "description": "课程核心知识点，涵盖大数据相关的系统、工具、应用与挑战。"
+    },
+    {
+      "id": "base_concept",
+      "name": "大数据基础概念",
+      "category": "Concept",
+      "description": "阐述大数据的定义、特征和发展趋势。"
+    },
+    {
+      "id": "acquisition",
+      "name": "数据获取",
+      "category": "Concept",
+      "description": "介绍大数据采集的方式和工具。"
+    },
+    {
+      "id": "quality",
+      "name": "数据质量与预处理",
+      "category": "Concept",
+      "description": "说明数据清洗、预处理的重要性和方法。"
+    },
+    {
+      "id": "storage",
+      "name": "数据存储系统",
+      "category": "Concept",
+      "description": "讲解大数据存储的原理和技术。"
+    },
+    {
+      "id": "processing",
+      "name": "数据处理系统",
+      "category": "Concept",
+      "description": "介绍大数据处理的基本方法和常用系统。"
+    },
+    {
+      "id": "platform",
+      "name": "大数据平台与工具",
+      "category": "Concept",
+      "description": "列举主流大数据平台和工具。"
+    },
+    {
+      "id": "application",
+      "name": "大数据应用与挑战",
+      "category": "Concept",
+      "description": "分析大数据在实际应用中的机遇与挑战。"
+    }
+  ],
+  "links": [
+    { "source": "root", "target": "concept", "relation": "包含" },
+    { "source": "root", "target": "acquisition", "relation": "包含" },
+    { "source": "root", "target": "quality", "relation": "包含" },
+    { "source": "root", "target": "storage", "relation": "包含" },
+    { "source": "root", "target": "processing", "relation": "包含" },
+    { "source": "root", "target": "platform", "relation": "包含" },
+    { "source": "root", "target": "application", "relation": "包含" },
+    { "source": "concept", "target": "acquisition", "relation": "前置" },
+    { "source": "acquisition", "target": "quality", "relation": "前置" },
+    { "source": "quality", "target": "storage", "relation": "前置" },
+    { "source": "storage", "target": "processing", "relation": "前置" },
+    { "source": "processing", "target": "platform", "relation": "前置" },
+    { "source": "platform", "target": "application", "relation": "前置" }
+  ]
+}

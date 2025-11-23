@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import QuestionsView from '@/views/Questions/index.vue'
-
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -64,12 +63,12 @@ const router = createRouter({
           meta: { title: '学习过程可视化', roles: ['student'] }
         },
         {
-          path: 'ai-assistant',
+          path: 'ai-assistant/:conv_id?',
           name: 'AIAssistant',
           component: () => import('@/views/AIAssistant/index.vue'),
           meta: { title: 'AI助教' }
         },
-        { 
+        {
           path: 'teacher-tasks',
           name: 'TeacherTasks',
           component: () => import('@/views/Tasks/TeacherTasks.vue'),
