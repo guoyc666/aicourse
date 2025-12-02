@@ -11,12 +11,12 @@ class BaseNode(BaseModel):
 class CourseNode(BaseNode):
     category: Literal["Course"]
     description: Optional[str] = None
-    depth: Optional[int] = None
+    depth: Literal[0] = 0
 
 class ConceptNode(BaseNode):
     category: Literal["Concept"]
     description: Optional[str] = None
-    depth: Optional[int] = None
+    depth: int
     difficulty: Optional[int] = None
     importance: Optional[int] = None
 
@@ -24,16 +24,27 @@ class ResourceNode(BaseNode):
     category: Literal["Resource"]
     type: str
 
+class ResourceSimpleInfo(BaseModel):
+    id: str
+    name: str
+
 GraphNode = Union[CourseNode, ConceptNode, ResourceNode]
 
-class GraphLink(BaseModel):
+class GraphEdge(BaseModel):
     source: str
     target: str
     relation: str
 
 class GraphData(BaseModel):
     nodes: List[GraphNode]
-    links: List[GraphLink]
+    edges: List[GraphEdge]
+
+class GraphDataOut(GraphData):
+    resources: List[ResourceSimpleInfo]
+
+class KnowledgeInfo(BaseModel):
+    id: str
+    name: str
 
 class ResourceInfo(BaseModel):
     id: str

@@ -17,7 +17,7 @@ BASE_URL = "http://localhost:8000/api"
 #     {"id": "RNN", "category": "Concept", "depth": 3, "name": "循环神经网络"},
 # ]
 
-# links = [
+# edges = [
 #     {"source": "IntroductionToAI", "target": "MachineLearning", "relation": "包含"},
 #     {"source": "IntroductionToAI", "target": "DeepLearning", "relation": "包含"},
 #     {"source": "IntroductionToAI", "target": "DataPreprocessing", "relation": "包含"},
@@ -43,46 +43,53 @@ nodes = [
     "id": "base_concept",
     "name": "大数据基础概念",
     "category": "Concept",
-    "description": "阐述大数据的定义、特征和发展趋势。"
+    "description": "阐述大数据的定义、特征和发展趋势。",
+    "depth": 1
 },
 {
     "id": "acquisition",
     "name": "数据获取",
     "category": "Concept",
-    "description": "介绍大数据采集的方式和工具。"
+    "description": "介绍大数据采集的方式和工具。",
+    "depth": 1
 },
 {
     "id": "quality",
     "name": "数据质量与预处理",
     "category": "Concept",
-    "description": "说明数据清洗、预处理的重要性和方法。"
+    "description": "说明数据清洗、预处理的重要性和方法。",
+    "depth": 1
 },
 {
     "id": "storage",
     "name": "数据存储系统",
     "category": "Concept",
-    "description": "讲解大数据存储的原理和技术。"
+    "description": "讲解大数据存储的原理和技术。",
+    "depth": 1
 },
 {
     "id": "processing",
     "name": "数据处理系统",
     "category": "Concept",
-    "description": "介绍大数据处理的基本方法和常用系统。"
+    "description": "介绍大数据处理的基本方法和常用系统。",
+    "depth": 1
 },
 {
     "id": "platform",
     "name": "大数据平台与工具",
     "category": "Concept",
-    "description": "列举主流大数据平台和工具。"
+    "description": "列举主流大数据平台和工具。",
+    "depth": 1
 },
 {
     "id": "application",
     "name": "大数据应用与挑战",
     "category": "Concept",
-    "description": "分析大数据在实际应用中的机遇与挑战。"
+    "description": "分析大数据在实际应用中的机遇与挑战。",
+    "depth": 1
 }
 ]
-links = [
+edges = [
 { "source": "root", "target": "base_concept", "relation": "包含" },
 { "source": "root", "target": "acquisition", "relation": "包含" },
 { "source": "root", "target": "quality", "relation": "包含" },
@@ -98,8 +105,8 @@ links = [
 { "source": "platform", "target": "application", "relation": "前置" }
 ]
 
-requests.post(f"{BASE_URL}/graph", json={"nodes": nodes, "links": links})
-print(f"新增节点数：{len(nodes)}，新增关系数：{len(links)}")
+requests.post(f"{BASE_URL}/graph", json={"nodes": nodes, "edges": edges})
+print(f"新增节点数：{len(nodes)}，新增关系数：{len(edges)}")
 
 # 批量删除所有节点
 # for node in nodes:

@@ -5,8 +5,7 @@ from datetime import datetime, timedelta
 BASE_URL = "http://localhost:8000/api"
 
 resource_ids = [
-    "DL_Res1", "ML_Res1", "ML_Res2", "ML_Res3", "ML_Res4", "ML_Res5", "ML_Res6", "ML_Res7", "ML_Res8",
-    "NN_Res1", "NN_Res2", "NN_Res3", "NN_Res4", "ppt_001"
+    "test_resource_1", "test_resource_2",
 ]
 students = [1, 2, 3]
 start_date = datetime(2025, 6, 1)

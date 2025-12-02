@@ -1,15 +1,16 @@
 from pydantic import BaseModel
 
-class MasteryBase(BaseModel):
-    student_id: int
+class MasteryOut(BaseModel):
+    mastery: float
     knowledge_id: str
+
+class MasteryListOut(BaseModel):
+    knowledge_id: str
+    student_id: int
+    student_name: str
     mastery: float
 
-class MasteryCreate(MasteryBase):
-    pass
-
-class MasteryUpdate(BaseModel):
-    mastery: float
-
-class MasteryOut(MasteryBase):
-    pass
+class AverageMasteryOut(BaseModel):
+    knowledge_id: str
+    average_mastery: float
+    

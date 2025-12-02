@@ -1,16 +1,11 @@
-// 定义进度数据类型
-type ProgressData = {
-  studentId: number;
-  resourceId: string;
-  status: number;
-  totalTime: number;
-  pageTimes?: number[];
-};
+import { recordsAPI } from "../api";
+import type { LearningRecord } from "../types";
+import { useUserStore } from "../stores/user";
 
-// 模拟后端日志记录
-function reportProgress(data: ProgressData) {
-  // 实际开发中可用 axios.post('/api/progress', data)
-  console.log("上报学习进度：", data);
+const userStore = useUserStore();
+
+async function reportProgress(data: LearningRecord) {
+  recordsAPI.addLearningRecord(data); 
 }
 
 // 1. 分页资源（如 PPT）
@@ -23,7 +18,7 @@ export function trackPagingResource(resourceId: string, totalPages: number) {
 
   function onPageChange(newPage: number) {
     const now = Date.now();
-    pageTimes[currentPage] += Math.floor((now - pageEnterTime) / 1000);
+    pageTimes[currentPage]! += Math.floor((now - pageEnterTime) / 1000);
     currentPage = newPage;
     pageEnterTime = now;
     if (currentPage === totalPages - 1) {
@@ -31,12 +26,13 @@ export function trackPagingResource(resourceId: string, totalPages: number) {
       // 到达最后一页
       const totalTime = Math.floor((Date.now() - startTime) / 1000);
       reportProgress({
-        studentId: 1,
-        resourceId,
+        student_id: userStore.user.id,
+        resource_id: resourceId,
         status: 1,
-        totalTime,
-        pageTimes,
+        total_time: totalTime,
+        page_times: pageTimes,
       });
+
     }
   }
 
@@ -44,10 +40,11 @@ export function trackPagingResource(resourceId: string, totalPages: number) {
     if (learned) return;
     const totalTime = Math.floor((Date.now() - startTime) / 1000);
     reportProgress({
-      studentId: 1,
-      resourceId,
+      student_id: userStore.user.id,
+      resource_id: resourceId,
       status: 0,
-      totalTime,
+      total_time: totalTime,
+      page_times: pageTimes,
     });
   }
 
@@ -67,10 +64,10 @@ export function trackScrollResource(resourceId: string) {
       learned = true;
       const totalTime = Math.floor((Date.now() - startTime) / 1000);
       reportProgress({
-        studentId: 1,
-        resourceId,
+        student_id: userStore.user.id,
+        resource_id: resourceId,
         status: 1,
-        totalTime,
+        total_time: totalTime,
       });
     }
   }
@@ -79,10 +76,10 @@ export function trackScrollResource(resourceId: string) {
     if (learned) return;
     const totalTime = Math.floor((Date.now() - startTime) / 1000);
     reportProgress({
-      studentId: 1,
-      resourceId,
+      student_id: userStore.user.id,
+      resource_id: resourceId,
       status: 0,
-      totalTime,
+      total_time: totalTime,
     });
   }
 
@@ -96,6 +93,7 @@ export function trackVideoResource(
 ) {
   let startTime = 0;
   let totalTime = 0;
+  let learned = false;
 
   function onPlay() {
     if (startTime === 0) {
@@ -105,16 +103,31 @@ export function trackVideoResource(
   
   function onEnded() {
     if (startTime !== 0) {
+      learned = true;
       totalTime = (Date.now() - startTime) / 1000;
       // 这里可以上报学习时长
       reportProgress({
-        studentId: 1,
-        resourceId,
+        student_id: userStore.user.id,
+        resource_id: resourceId,
         status: 1,
-        totalTime: Math.floor(totalTime),
+        total_time: Math.floor(totalTime),
       });
     }
     startTime = 0;
+  }
+
+  function onClosed() {
+    if (learned) return;
+    if (startTime !== 0) {
+      totalTime += (Date.now() - startTime) / 1000;
+      // 这里可以上报学习时长
+      reportProgress({
+        student_id: userStore.user.id,
+        resource_id: resourceId,
+        status: 0,
+        total_time: Math.floor(totalTime),
+      });
+    }
   }
 
   videoEl.addEventListener("play", onPlay);
@@ -123,5 +136,6 @@ export function trackVideoResource(
   return () => {
     videoEl.removeEventListener("play", onPlay);
     videoEl.removeEventListener("ended", onEnded);
+    onClosed();
   };
 }

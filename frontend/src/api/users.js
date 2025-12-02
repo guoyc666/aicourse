@@ -9,6 +9,14 @@ export const getUsers = (params = {}) => {
   })
 }
 
+export const getStudents = (params = {}) => {
+  return request({
+    url: '/api/users/students/',
+    method: 'get',
+    params
+  })
+}
+
 // 获取特定用户信息
 export const getUser = (userId) => {
   return request({

@@ -16,10 +16,7 @@ from schemas import FileResourceResponse
 from config import config  # 导入配置对象
 
 # 创建路由对象
-router = APIRouter(
-    prefix="",
-    tags=["文件资源"]
-)
+router = APIRouter()
 
 # 1.资源上传接口
 def get_unique_filename(original_filename: str) -> str:
@@ -68,7 +65,7 @@ def _analyze_file_task(
         download_url=download_url,
     )
 
-@router.post(config.api.UPLOAD_ENDPOINT, summary="上传资源文件")
+@router.post("/resource/upload", summary="上传资源文件")
 async def upload_resource(
     file: UploadFile = File(...),
     title: str = Form(..., description="文件标题"),
@@ -202,7 +199,7 @@ async def upload_resource(
         )
 
 # 2.获取文件列表（支持搜索和分页）
-@router.get(f"{config.api.BASE_PATH}/resources", summary="获取文件资源列表")
+@router.get(f"/resources", summary="获取文件资源列表")
 async def get_resources(
     skip: int = 0,
     limit: int = 10,
@@ -251,7 +248,7 @@ async def get_resources(
     }
 
 # 3.删除文件
-@router.delete(f"{config.api.BASE_PATH}/resources/{{file_id}}", summary="删除文件资源")
+@router.delete("/resources/{file_id}", summary="删除文件资源")
 async def delete_resource(
     file_id: str,
     current_user: User = Depends(get_current_user),
@@ -282,7 +279,7 @@ async def delete_resource(
     return {"message": "文件删除成功"}
 
 # 5.文件下载端点（位于编辑端点之后）
-@router.get(f"{config.api.DOWNLOAD_URL_PREFIX}/{{filename:path}}", summary="下载文件资源")
+@router.get("/resources/{filename:path}", summary="下载文件资源")
 async def download_file(
     filename: str,
     # 完全移除用户认证，任何人都可以访问文件
@@ -344,7 +341,7 @@ async def download_file(
         )
 
 # 4.编辑资源信息
-@router.put(f"{config.api.BASE_PATH}/resources/{{file_id}}", summary="编辑资源信息")
+@router.put("/resources/{file_id}", summary="编辑资源信息")
 async def update_resource(
     file_id: str,
     request_data: dict,  # 使用字典接收JSON数据

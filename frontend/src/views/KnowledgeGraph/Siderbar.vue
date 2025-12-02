@@ -14,18 +14,37 @@
         <!-- 学情概览 -->
         <section class="detail-section">
           <div class="section-title">学情概览 <span class="update-tip">数据次日更新</span></div>
-          <div class="overview-row">
-            <div class="overview-item">
-              <div class="overview-label">学习完成度</div>
-              <div class="overview-value">{{ progress()}}%</div>
+          <div v-if="isStudent">
+            <div class="overview-row">
+              <div class="overview-item">
+                <div class="overview-label">学习完成度</div>
+                <div class="overview-value">{{ progressPercent}}%</div>
+              </div>
+              <div class="overview-item">
+                <div class="overview-label">知识点掌握度</div>
+                <div class="overview-value">{{ masteryPercent }}%</div>
+              </div>
+              <div class="overview-item">
+                <div class="overview-label">学习时长</div>
+                <div class="overview-value">{{ graphStore.nodeDetail?.total_time }}分钟</div>
+              </div>
             </div>
-            <div class="overview-item">
-              <div class="overview-label">知识点掌握度</div>
-              <div class="overview-value">{{ mastery() }}%</div>
-            </div>
-            <div class="overview-item">
-              <div class="overview-label">学习时长</div>
-              <div class="overview-value">{{ graphStore.nodeDetail?.total_time }}分钟</div>
+          </div>
+          <div v-else>
+            <!-- 老师/管理员视角：展示平均和每个学生 -->
+            <div class="overview-row">
+              <div class="overview-item">
+                <div class="overview-label">平均完成度</div>
+                <div class="overview-value">{{ progressPercent }}%</div>
+              </div>
+              <div class="overview-item">
+                <div class="overview-label">平均掌握度</div>
+                <div class="overview-value">{{ masteryPercent }}%</div>
+              </div>
+              <div class="overview-item">
+                <div class="overview-label">平均学习时长</div>
+                <div class="overview-value">{{ graphStore.nodeDetail?.average_time }}分钟</div>
+              </div>
             </div>
           </div>
         </section>
@@ -80,31 +99,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useGraphStore } from "../../stores/graphStore";
 import { useAnalysisStore } from "../../stores/analysisStore";
+import { useUserStore } from "../../stores/user";
 
-const isTeacher = ref(false);
+const userStore = useUserStore();
+
+const isStudent = userStore.hasRole("student")
 
 const detailTab = ref('overview');
 const graphStore = useGraphStore();
 const analysisStore = useAnalysisStore();
 
-const mastery = () => {
-  if (!graphStore.selectedNode) return "-";
-  const value = isTeacher.value
-    ? analysisStore.getAverageMasteryByKnowledgeId(graphStore.selectedNode.id) * 100
-    : analysisStore.getMasteryByKnowledgeId(graphStore.selectedNode.id) * 100;
-  return value ? Math.round(value) : "0";
-};
+const masteryPercent = computed(() => {
+  const mastery = analysisStore.getMasteryByKnowledgeId(graphStore.selectedNodeID!);
+  return +(mastery * 100).toFixed(2);
+});
 
-const progress = () => {
-  if (!graphStore.selectedNode) return "-";
-  const value = isTeacher.value
-    ? analysisStore.getAverageProgressByKnowledgeId(graphStore.selectedNode.id) * 100
-    : analysisStore.getProgressByKnowledgeId(graphStore.selectedNode.id) * 100;
-  return value ? Math.round(value) : "0";
-};
+const progressPercent = computed(() => {
+  const progress = analysisStore.getProgressByKnowledgeId(graphStore.selectedNodeID!);
+  return +(progress * 100).toFixed(2);
+});
 
 </script>
 

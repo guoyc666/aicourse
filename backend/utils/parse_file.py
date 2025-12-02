@@ -6,12 +6,15 @@ from pptx import Presentation
 import whisper
 from .parse_image import understand_image
 from .chroma_manager import VectorStore
+from .graph_utils import addResourseToGraph
 
 
 def analyse_file(filename, filepath, fileid, download_url, file_type):
     """解析文件并存入向量数据库"""
     try:
         text = extract_text(filepath, file_type)
+        print(text[:100])
+        addResourseToGraph(fileid, filename, file_type, text)
         chunks = chunk_text(text)
         docs, metas, ids = [], [], []
         

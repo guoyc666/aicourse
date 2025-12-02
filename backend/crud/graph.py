@@ -1,9 +1,51 @@
 from typing import List, Dict, Any
 from py2neo import Node, Relationship
-from crud.progress import calc_progress
-from db.neo4j import get_graph
-from models import KnowledgePoint, Resource, KnowledgeResourceLink, LearningRecord
+from neo4j import get_graph
+from models import FileResource, LearningRecord
 from sqlalchemy.orm import Session
+
+def get_all_knowledge_points():
+    graph = get_graph()
+    knowledge_query = """
+    MATCH (k:Concept)
+    RETURN k.id AS id
+    """
+    knowledge_points = graph.run(knowledge_query).data()
+    knowledge_ids = [kp["id"] for kp in knowledge_points]
+    return knowledge_ids
+
+def get_all_knowledge_nodes():
+    graph = get_graph()
+    knowledge_query = """
+    MATCH (k:Concept)
+    RETURN k.id AS id, k.name AS name
+    """
+    knowledge_points = graph.run(knowledge_query).data()
+    return knowledge_points
+
+def get_resources_by_knowledge(knowledge_id: str):
+    graph = get_graph()
+    resource_query = f"""
+    MATCH (k:Concept {{id: '{knowledge_id}'}})-[:关联]->(r:Resource)
+    RETURN r.id AS id
+    UNION
+    MATCH (k:Concept {{id: '{knowledge_id}'}})-[:包含*1..]->(sub:Concept)-[:关联]->(r:Resource)
+    RETURN DISTINCT r.id AS id
+    """
+    resources = graph.run(resource_query).data()
+    resource_ids = [r["id"] for r in resources]
+    return resource_ids
+
+def get_all_students(db: Session):
+    from models import User, Role, UserRole
+    # 查询学生角色id
+    student_role = db.query(Role).filter(Role.name == "student").first()
+    if not student_role:
+        return []
+    # 查询所有拥有学生角色的用户
+    student_ids = db.query(UserRole.user_id).filter(UserRole.role_id == student_role.id).subquery()
+    students = db.query(User).filter(User.id.in_(student_ids)).all()
+    return students
 
 def get_node_depths():
     graph = get_graph()
@@ -20,83 +62,67 @@ def get_node_depths():
     result = graph.run(query).data()
     return {row["id"]: row["depth"] for row in result if row["id"] is not None}
 
-def get_all_nodes_and_links():
+def get_all_nodes_and_edges():
     graph = get_graph()
-    nodes = []
-    links = []
-    
-    depths = get_node_depths()
+    concept_nodes = list(graph.nodes.match("Concept"))
+    course_nodes = list(graph.nodes.match("Course"))
+    nodes = concept_nodes + course_nodes
+    resources = list(graph.nodes.match("Resource")) 
 
-    # 只查询Concept和Course节点
-    for n in graph.nodes.match():
-        if n["category"] not in ["Concept", "Course"]:
-            continue
-        node_data = dict(n)
-        node_data["id"] = n["id"]
-        node_data["category"] = n["category"]
-        node_data["name"] = n["name"]
-        node_data["description"] = n.get("description")
-        if node_data["category"] == "Course":
-            node_data["depth"] = 0
-        elif node_data["category"] == "Concept":
-            node_data["depth"] = depths.get(node_data["id"], None)
-            node_data["difficulty"] = n.get("difficulty")
-            node_data["importance"] = n.get("importance")
-        nodes.append(node_data)
+    # 只查询包含和前置关系
+    query = """
+    MATCH (a)-[r:包含]->(b)
+    RETURN a.id AS source, b.id AS target, '包含' AS relation
+    UNION
+    MATCH (a)-[r:前置]->(b)
+    RETURN a.id AS source, b.id AS target, '前置' AS relation
+    UNION
+    MATCH (a)-[r:关联]->(b)
+    RETURN a.id AS source, b.id AS target, '关联' AS relation
+    """
+    edges = graph.run(query).data()
 
-    # 查询所有关系（不变）
-    rels = graph.match()
-    for r in rels:
-        links.append({
-            "source": r.start_node["id"],
-            "target": r.end_node["id"],
-            "relation": r.__class__.__name__
-        })
+    return nodes, edges, resources
 
-    return nodes, links
-
-def get_node_detail(node_id: str, student_id: int, db: Session):
+def get_node_detail(db: Session, node_id: str, user_id: int, is_student: bool):
     graph = get_graph()
     # 查询节点基本信息（Neo4j）
     n = graph.nodes.match(id=node_id).first()
     if not n:
         return None
 
-    # 查询所有资源（直接和子关联），用is_child标记
-    # resource_query = f"""
-    # MATCH (k:Concept {{id: '{node_id}'}})-[:关联]->(r:Resource)
-    # RETURN r.id AS id, r.name AS name, r.type AS type, false AS is_child
-    # UNION
-    # MATCH (k:Concept {{id: '{node_id}'}})-[:子关联]->(r:Resource)
-    # RETURN r.id AS id, r.name AS name, r.type AS type, true AS is_child
-    # """
-    # resources = graph.run(resource_query).data()
+    # 查询所有资源
+    resource_query = f"""
+    MATCH (k:Concept {{id: '{node_id}'}})-[:关联]->(r:Resource)
+    RETURN r.id AS id, r.name AS name, r.type AS type, false AS is_child
+    UNION
+    MATCH (k:Concept {{id: '{node_id}'}})-[:包含*1..]->(sub:Concept)-[:关联]->(r:Resource)
+    RETURN DISTINCT r.id AS id, r.name AS name, r.type AS type, true AS is_child
+    """
+    resources = graph.run(resource_query).data()
 
-    # 查询所有资源在关系数据库KnowledgeResourceLink
-    kr_links = db.query(KnowledgeResourceLink).filter(
-        KnowledgeResourceLink.knowledge_id == node_id
-    ).all()
-    resources = []
-    for link in kr_links:
-        res = db.query(Resource).filter(Resource.id == link.resource_id).first()
-        if res:
-            resources.append({
-                "id": res.id,
-                "name": res.name,
-                "type": "ppt",
-                "is_child": link.is_child,
-            })
-
+    # 去重资源列表，优先保留 is_child=False
+    unique_resources = {}
+    for r in resources:
+        rid = r["id"]
+        # 如果已存在且 is_child=False，则不覆盖
+        if rid in unique_resources:
+            if not unique_resources[rid]["is_child"]:
+                continue
+        unique_resources[rid] = r
+    resources = list(unique_resources.values())
 
     # 查询资源的学习记录
     resource_ids = [r["id"] for r in resources]
     records = db.query(LearningRecord).filter(
         LearningRecord.resource_id.in_(resource_ids),
     ).all()
-    # 筛选该学生的学习记录
-    student_records = [r for r in records if r.student_id == student_id]
-    # 计算总学习时长
-    total_time = int(sum(r.total_time for r in student_records)/60)  # 转为分钟
+    total_time = 0
+    if is_student:
+        # 筛选该学生的学习记录
+        student_records = [r for r in records if r.student_id == user_id]
+        # 计算总学习时长
+        total_time = int(sum(r.total_time for r in student_records)/60)  # 转为分钟
     # 计算所有学生的平均学习时长，先从records中筛选出有多少不同学生学习过这些资源，然后计算平均值
     student_ids = set(r.student_id for r in records)
     total_times = sum(r.total_time for r in records)
@@ -127,30 +153,51 @@ def get_node_detail(node_id: str, student_id: int, db: Session):
         "successors": successors,
     }
 
-def save_knowledge_graph(nodes: List[Dict[str, Any]], links: List[Dict[str, Any]]):
+def save_knowledge_graph(nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]):
     graph = get_graph()
-    # 清空现有图谱
-    graph.delete_all()
 
+    # 更新或新增节点
     node_map = {}
-    # 创建节点
     for node in nodes:
         props = {k: v for k, v in node.items() if v is not None and k not in ["x", "y"]}
-        n = Node(node["category"], **props)
-        graph.create(n)
+        n = graph.nodes.match(node["category"], id=node["id"]).first()
+        if n:
+            # 更新已有节点属性
+            for k, v in props.items():
+                n[k] = v
+            graph.push(n)
+        else:
+            # 新建节点
+            n = Node(node["category"], **props)
+            graph.create(n)
         node_map[node["id"]] = n
 
-    # 创建关系
-    for link in links:
-        source_node = node_map.get(link["source"])
-        target_node = node_map.get(link["target"])
-        if source_node and target_node:
-            r = Relationship(source_node, link["relation"], target_node)
-            graph.create(r)
+    # 删除未在 nodes 列表中的节点
+    for n in graph.nodes.match():
+        if n["id"] not in node_map:
+            graph.delete(n)
 
-def batch_add_nodes_and_links(nodes: List[Dict[str, Any]], links: List[Dict[str, Any]]):
+    # 更新或新增关系
+    exist_rels = set()
+    for edge in edges:
+        source_node = node_map.get(edge["source"])
+        target_node = node_map.get(edge["target"])
+        if source_node and target_node:
+            rel = Relationship(source_node, edge["relation"], target_node)
+            graph.merge(rel)
+            exist_rels.add((edge["source"], edge["target"], edge["relation"]))
+
+    # 删除未在 edges 列表中的关系
+    for r in graph.match():
+        sid = r.start_node["id"]
+        tid = r.end_node["id"]
+        rel_type = r.__class__.__name__
+        if (sid, tid, rel_type) not in exist_rels:
+            graph.separate(r)
+
+def batch_add_nodes_and_edges(nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]):
     # nodes: [{"id": ..., "category": ..., "name": ..., ...}, ...]
-    # links: [{"source": ..., "target": ..., "relation": ...}, ...]
+    # edges: [{"source": ..., "target": ..., "relation": ...}, ...]
     graph = get_graph()
     # 批量添加节点
     for node_data in nodes:
@@ -158,29 +205,28 @@ def batch_add_nodes_and_links(nodes: List[Dict[str, Any]], links: List[Dict[str,
         graph.merge(node, node_data.get("category", "Concept"), "id")
 
     # 批量添加关系
-    for link_data in links:
-        source = graph.nodes.match("Concept", id=link_data["source"]).first()
+    for edge_data in edges:
+        source = graph.nodes.match("Concept", id=edge_data["source"]).first()
         if not source:
-            source = graph.nodes.match("Course", id=link_data["source"]).first()
-        target = graph.nodes.match("Concept", id=link_data["target"]).first()
-        if not target:
-            target = graph.nodes.match("Course", id=link_data["target"]).first()
+            source = graph.nodes.match("Course", id=edge_data["source"]).first()
+        if edge_data["relation"] == "关联":
+            target = graph.nodes.match("Resource", id=edge_data["target"]).first()
+        else:
+            target = graph.nodes.match("Concept", id=edge_data["target"]).first()
         if source and target:
-            rel = Relationship(source, link_data["relation"], target)
+            rel = Relationship(source, edge_data["relation"], target)
             graph.merge(rel)
 
 def create_node(node: Dict[str, Any]):
     graph = get_graph()
-    props = {k: v for k, v in node.items() if v is not None and k not in ["x", "y"]}
-    n = Node(node["category"], **props)
+    n = Node(node["category"], **node)
     graph.create(n)
 
-def update_node(node_id: str, updates: Dict[str, Any]):
+def update_node(node: Dict[str, Any]):
     graph = get_graph()
-    updates = {k: v for k, v in updates.items() if k not in ["x", "y"]}
-    n = graph.nodes.match(id=node_id).first()
+    n = graph.nodes.match(id=node["id"]).first()
     if n:
-        for k, v in updates.items():
+        for k, v in node.items():
             n[k] = v
         graph.push(n)
 
@@ -190,15 +236,15 @@ def delete_node(node_id: str):
     if n:
         graph.delete(n)
 
-def create_link(link: Dict[str, Any]):
+def create_edge(edge: Dict[str, Any]):
     graph = get_graph()
-    a = graph.nodes.match(id=link["source"]).first()
-    b = graph.nodes.match(id=link["target"]).first()
+    a = graph.nodes.match(id=edge["source"]).first()
+    b = graph.nodes.match(id=edge["target"]).first()
     if a and b:
-        r = Relationship(a, link["relation"], b)
+        r = Relationship(a, edge["relation"], b)
         graph.create(r)
 
-def delete_link(source: str, target: str, relation: str):
+def delete_edge(source: str, target: str, relation: str):
     graph = get_graph()
     a = graph.nodes.match(id=source).first()
     b = graph.nodes.match(id=target).first()
@@ -206,3 +252,7 @@ def delete_link(source: str, target: str, relation: str):
         rels = graph.match((a, b), r_type=relation)
         for r in rels:
             graph.separate(r)
+
+def delete_all_nodes_and_edges():
+    graph = get_graph()
+    graph.delete_all()

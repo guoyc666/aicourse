@@ -2,15 +2,16 @@ export interface BaseNode {
   id: string;
   category: string;
   name: string;
-  description?: string;
 }
 
 export interface CourseNode extends BaseNode {
+  description?: string;
   category: "Course"; // 课程节点
   depth: number;
 }
 
 export interface ConceptNode extends BaseNode {
+  description?: string;
   category: "Concept"; // 概念节点
   depth: number;
   difficulty?: number;
@@ -19,34 +20,46 @@ export interface ConceptNode extends BaseNode {
   progress?: number;
 }
 
-export type ResourceNode =
-  | (BaseNode & {
-      category: "Resource";
-      type: "video" | "audio";
-      size?: string;
-      duration?: string;
-    })
-  | (BaseNode & {
-      category: "Resource";
-      type: "ppt" | "pdf";
-      size?: string;
-      pageCount?: number;
-    })
-  | (BaseNode & {
-      category: "Resource";
-      type: "doc";
-      size?: string;
-      wordCount?: number;
-    });
+export interface ResourceNode extends BaseNode {
+  category: "Resource"; // 资源节点
+  type: string; // 资源类型，如视频、文档等
+}
 
 // 联合类型
-export type KnowledgeNode = CourseNode | ConceptNode | ResourceNode;
+export type KnowledgeNode = CourseNode | ConceptNode;
 
-export type KnowledgeLink = {
+export type KnowledgeEdge = {
   source: string;
   target: string;
   relation: string;
 };
+
+export type CategoryType = "Concept" | "Course";
+
+export type CytoscapeNode = {
+  data: {
+    id: string;
+    name: string;
+    description?: string;
+    category: CategoryType;
+    depth: number;
+    expanded: boolean;
+    img: string;
+  };
+};
+
+export type CytoscapeEdge = {
+  data: {
+    source: string;
+    target: string;
+    relation: string;
+  };
+};
+
+export type CytoscapeElements = {
+  nodes: CytoscapeNode[];
+  edges: CytoscapeEdge[];
+}
 
 export type LearningRecord = {
   id?: number;
@@ -54,17 +67,9 @@ export type LearningRecord = {
   resource_id: string;
   status: number; // 0: 未完成, 1: 已完成
   total_time: number; // 总学习时长，单位为秒
-  page_times: number[]; // 每页学习时长数组，单位为秒
-  timestamp: string; // 学习记录的时间戳
+  page_times?: number[]; // 每页学习时长数组，单位为秒
+  timestamp?: string; // 学习记录的时间戳
 };
-
-export type DailyEvent = {
-  id: number;
-  resource_id: string;
-  resource_name: string;
-  time: string; // "HH:MM" 格式的时间字符串
-  duration: number; // 学习时长，单位为秒
-}
 
 export type NodeDetail = {
   id: string;                    // 节点ID
@@ -86,4 +91,12 @@ export type NodeDetail = {
     id: string;
     name: string;
   }>;                            // 后续知识点
-}
+};
+
+export type DailyEvent = {
+  id: number;
+  resource_id: string;
+  resource_name: string;
+  time: string; // "HH:MM" 格式的时间字符串
+  duration: number; // 学习时长，单位为秒
+};

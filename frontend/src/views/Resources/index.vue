@@ -581,7 +581,7 @@ const handleFileChange = (file) => {
   
   // 自动设置标题
   if (!uploadForm.title) {
-    uploadForm.title = file.name.split('.')[0]
+    uploadForm.title = file.name.substring(0, file.name.lastIndexOf('.')) || file.name
   }
   
   // 自动设置文件类型

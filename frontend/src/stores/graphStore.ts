@@ -1,17 +1,22 @@
 import { defineStore } from "pinia";
 import { graphAPI } from "../api";
-import type { KnowledgeLink, KnowledgeNode, NodeDetail } from "../types";
+import type { KnowledgeEdge, KnowledgeNode, NodeDetail } from "../types";
 import { isEmpty } from "element-plus/es/utils/types.mjs";
 
 // 定义 Store 的类型
 interface GraphState {
   nodes: KnowledgeNode[];
-  links: KnowledgeLink[];
-  selectedNode: KnowledgeNode | null;
-  nodeDetail: NodeDetail | null;
+  edges: KnowledgeEdge[];
+  resources: Array<{
+    id: string;
+    name: string;
+  }>;
   editMode: boolean;
-  editNodes: KnowledgeNode | null;
-  editLinks: KnowledgeLink | null;
+
+  selectedNodeID: string | null;
+  nodeDetail: NodeDetail | null;
+  
+  updating: boolean;
   loading: boolean;
   error: string | null;
 }
@@ -19,12 +24,14 @@ interface GraphState {
 export const useGraphStore = defineStore("graph", {
   state: (): GraphState => ({
     nodes: [],
-    links: [],
-    selectedNode: null,
-    nodeDetail: null,
+    edges: [],
+    resources: [],
     editMode: false,
-    editNodes: null,
-    editLinks: null,
+
+    selectedNodeID: null,
+    nodeDetail: null,
+
+    updating: false,
     loading: false,
     error: null,
   }),
@@ -35,17 +42,30 @@ export const useGraphStore = defineStore("graph", {
       try {
         const response = await graphAPI.fetchKnowledgeGraph();
         this.nodes = response.nodes;
-        this.links = response.links;
+        this.edges = response.edges;
+        this.resources = response.resources;
+        //console.log("知识图谱数据：", response);
       } catch (err: any) {
         this.error = err.message || "获取知识图谱失败"; 
       } finally {
         this.loading = false;
       }
     },
+    async postGraph() {
+      this.loading = true;
+      this.error = null;
+      try {
+        await graphAPI.updateKnowledgeGraph(this.nodes,this.edges);
+      } catch (err: any) {
+        this.error = err.message || "更新知识图谱失败"; 
+      } finally {
+        this.loading = false;
+      }
+    },
     async selectNode(nodeId: string) {
-      this.selectedNode = this.nodes.find((n) => n.id === nodeId) || null;
+      this.selectedNodeID = nodeId;
       this.nodeDetail = null;
-      if (this.selectedNode) {
+      if (!this.editMode) {
         this.loading = true;
         try {
           const detail = await graphAPI.fetchNodeDetail(nodeId);
@@ -56,40 +76,34 @@ export const useGraphStore = defineStore("graph", {
         } finally {
           this.loading = false;
         }
-      } else {
-        this.error = "节点未找到";
       }
     },
     unSelectNode() {
-      this.selectedNode = null;
+      this.selectedNodeID = null;
       this.nodeDetail = null;
     },
     enterEditMode() {
+      this.unSelectNode();
       this.editMode = true;
-      this.editNodes = JSON.parse(JSON.stringify(this.nodes));
-      this.editLinks = JSON.parse(JSON.stringify(this.links));
+      this.updating = false;
     },
     exitEditMode(save = false) {
-      if (save && this.editNodes && this.editLinks) {
-        this.nodes = JSON.parse(JSON.stringify(this.editNodes));
-        this.links = JSON.parse(JSON.stringify(this.editLinks));
-      }
+      this.unSelectNode();
       this.editMode = false;
-      this.editNodes = null;
-      this.editLinks = null;
-    }
+      this.updating = save;
+    },
   },
   getters: {
     getNodeById: (state) => {
       return (id: string) => state.nodes.find((n) => n.id === id) || null;
     },
     getSelectedNodeDetail: (state) => {
-      if (state.selectedNode) {
+      if (state.selectedNodeID) {
         return state.nodeDetail;
       }
     },
     isEmpty: (state) => {
-      return isEmpty(state.nodes) && isEmpty(state.links);
+      return isEmpty(state.nodes) && isEmpty(state.edges);
     },
     isLoading: (state) => {
       return state.loading;

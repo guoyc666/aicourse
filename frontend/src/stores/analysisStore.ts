@@ -10,9 +10,6 @@ interface AnalysisState {
   masteryRecords: Record<string, number>; // knowledgeId -> mastery
   progressRecords: Record<string, number>; // knowledgeId -> progress
 
-  averageMasteryRecords: Record<string, number>; // knowledgeId -> mastery
-  averageProgressRecords: Record<string, number>; // knowledgeId -> progress
-
   calendarDurationRecords: [string, number][]; // [日期, 时长]
   selectedDay: string | null;
   selectedDayRecords: DailyEvent[]; // 存储所选日期的学习记录详情
@@ -26,9 +23,6 @@ export const useAnalysisStore = defineStore("Analysis", {
     masteryRecords: {},
     progressRecords: {},
 
-    averageMasteryRecords: {},
-    averageProgressRecords: {},
-
     calendarDurationRecords: [],
     selectedDay: null,
     selectedDayRecords: [],
@@ -37,19 +31,19 @@ export const useAnalysisStore = defineStore("Analysis", {
     error: null,
   }),
   actions: {
-    async fetchAllMastery(studentId: number) {
+    async fetchStudentRecords() {
       this.loading = true;
       this.error = null;
       try {
-        const response = await masteryAPI.fetchAllMastery(studentId);
-        const average_response = await masteryAPI.fetchAllAverageMastery();
-        this.averageMasteryRecords = {};
+        const mastery_response = await masteryAPI.fetchAllMastery();
+        const progress_response = await progressAPI.fetchAllProgress();
         this.masteryRecords = {};
-        response.forEach((record: any) => {
+        this.progressRecords = {};
+        mastery_response.forEach((record: any) => {
           this.masteryRecords[record.knowledge_id] = record.mastery;
         });
-        average_response.forEach((record: any) => {
-          this.averageMasteryRecords[record.knowledge_id] = record.mastery;
+        progress_response.forEach((record: any) => {
+          this.progressRecords[record.knowledge_id] = record.progress;
         });
       } catch (err: any) {
         this.error = err.message || "获取掌握度失败";
@@ -57,22 +51,23 @@ export const useAnalysisStore = defineStore("Analysis", {
         this.loading = false;
       }
     },
-    async fetchAllProgress(studentId: number) {
+    
+    async fetchAverageRecords() {
       this.loading = true;
       this.error = null;
       try {
-        const response = await progressAPI.fetchAllProgress(studentId);
-        const average_response = await progressAPI.fetchAllAverageProgress();
-        this.averageProgressRecords = {};
+        const mastery_response = await masteryAPI.fetchAllAverageMastery();
+        const progress_response = await progressAPI.fetchAllAverageProgress();
+        this.masteryRecords = {};
         this.progressRecords = {};
-        response.progress_data.forEach((record: any) => {
-          this.progressRecords[record.knowledge_id] = record.progress;
+        mastery_response.forEach((record: any) => {
+          this.masteryRecords[record.knowledge_id] = record.average_mastery;
         });
-        average_response.progress_data.forEach((record: any) => {
-          this.averageProgressRecords[record.knowledge_id] = record.progress;
+        progress_response.forEach((record: any) => {
+          this.progressRecords[record.knowledge_id] = record.average_progress;
         });
       } catch (err: any) {
-        this.error = err.message || "获取学习进度失败";
+        this.error = err.message || "获取平均掌握度失败";
       } finally {
         this.loading = false;
       }
@@ -118,12 +113,6 @@ export const useAnalysisStore = defineStore("Analysis", {
     },
     getProgressByKnowledgeId: (state) => {
       return (knowledgeId: string) => state.progressRecords[knowledgeId] || 0.0;
-    },
-    getAverageMasteryByKnowledgeId: (state) => {
-      return (knowledgeId: string) => state.averageMasteryRecords[knowledgeId] || 0.0;
-    },
-    getAverageProgressByKnowledgeId: (state) => {
-      return (knowledgeId: string) => state.averageProgressRecords[knowledgeId] || 0.0;
     },
   },
 });

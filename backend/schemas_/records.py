@@ -8,7 +8,21 @@ class LearningRecordCreate(BaseModel):
     status: int
     total_time: int
     page_times: List[int]
-    timestamp: datetime
 
 class LearningRecord(LearningRecordCreate):
     id: int
+    timestamp: datetime
+
+class StudyTimeOut(BaseModel):
+    study_time: float
+    knowledge_id: str
+
+class AverageStudyTimeOut(BaseModel):
+    knowledge_id: str
+    average_study_time: float
+
+class StudyTimeListOut(BaseModel):
+    knowledge_id: str
+    study_time: float
+    student_id: int
+    student_name: str

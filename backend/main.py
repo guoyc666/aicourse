@@ -12,9 +12,7 @@ from database import get_db, engine, Base
 from models import User, Role, Permission
 from auth import authenticate_user, create_access_token, get_current_user, verify_permission
 from schemas import UserCreate, UserLogin, UserResponse, Token, RoleResponse, TopicResponse, ReplyResponse
-from routers import auth, users, tasks, topics, ai_assistant, graph, knowledge, records, progress, mastery
-from file_resources import router as file_router
-from question import router as question_router
+from routers import auth, users, tasks, topics, ai_assistant, graph, records, progress, mastery, question, file_resources
 
 load_dotenv(".env")
 # 创建数据库表
@@ -39,14 +37,13 @@ app.include_router(auth.router, prefix="/api/auth", tags=["认证"])
 app.include_router(users.router, prefix="/api/users", tags=["用户管理"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["任务管理"])
 app.include_router(topics.router, prefix="/api/topics", tags=["讨论区"])
-app.include_router(file_router, prefix="", tags=["文件资源"])  # 注意：file_router内部已包含/api前缀
-app.include_router(question_router, prefix="", tags=["题库"])
+app.include_router(file_resources.router, prefix="/api", tags=["文件资源"])
+app.include_router(question.router, prefix="", tags=["题库"])  # 注意：question内部已包含/api前缀
 app.include_router(ai_assistant.router, prefix="/api/ai", tags=["AI助手"])
-app.include_router(graph.router, prefix="/api")
-app.include_router(knowledge.router, prefix="/api")
-app.include_router(records.router, prefix="/api")
-app.include_router(progress.router, prefix="/api")
-app.include_router(mastery.router, prefix="/api")
+app.include_router(graph.router, prefix="/api", tags=["知识图谱"])
+app.include_router(records.router, prefix="/api", tags=["学习记录"])
+app.include_router(progress.router, prefix="/api", tags=["学习进度"])
+app.include_router(mastery.router, prefix="/api", tags=["知识掌握度"])
 
 @app.get("/")
 async def root():
