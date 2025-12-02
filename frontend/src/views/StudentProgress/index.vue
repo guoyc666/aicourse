@@ -181,296 +181,83 @@ const activeTab = ref('0')
 
 // 获取学生答题记录的函数
 const getStudentQuestionRecords = async (userId) => {
+  if (!userId) {
+    return {
+      totalQuestions: 0,
+      totalCorrect: 0,
+      accuracyRate: 0,
+      records: [],
+      learningRecords: []
+    }
+  }
+
   try {
-    console.log(`开始获取用户${userId}的答题记录...`);
-    
-    // 直接调用API，尝试使用不同的参数名
-    let practiceHistory = [];
-    let found = false;
-    
-    // 增强的API调用逻辑，支持更多参数名和更好的错误处理
-    const paramOptions = [
-      { user_id: userId },
-      { userId: userId },
-      { id: userId },
-      { student_id: userId },
-      { studentId: userId }
-    ];
-    
-    // 封装API调用和响应处理逻辑
-    const tryFetchWithParams = async (params) => {
-      const paramName = Object.keys(params)[0];
-      try {
-        console.log(`尝试使用参数名 ${paramName} 获取用户${userId}的答题记录`);
-        const response = await request.get('/api/question/record/list', { params });
-        console.log(`使用${paramName}参数的响应:`, JSON.stringify(response, null, 2));
-        
-        // 更全面的响应格式处理
-        // 格式1: {data: {code: 200, data: {list: [...]}}}
-        if (response.data && response.data.code === 200 && 
-            response.data.data && Array.isArray(response.data.data.list)) {
-          return response.data.data.list;
-        }
-        // 格式2: {code: 200, data: {list: [...]}}
-        else if (response.code === 200 && response.data && 
-                 Array.isArray(response.data.list)) {
-          return response.data.list;
-        }
-        // 格式3: {data: {code: 200, data: [...]}}
-        else if (response.data && response.data.code === 200 && 
-                 Array.isArray(response.data.data)) {
-          return response.data.data;
-        }
-        // 格式4: {code: 200, data: [...]}
-        else if (response.code === 200 && Array.isArray(response.data)) {
-          return response.data;
-        }
-        // 格式5: {data: [...]}
-        else if (Array.isArray(response.data)) {
-          return response.data;
-        }
-        
-        console.log(`响应格式不匹配预期，但请求成功`);
-        return [];
-      } catch (error) {
-        console.error(`使用${paramName}参数请求失败:`, error);
-        return null; // 表示请求失败
+    const response = await request.get('/api/question/record/list', {
+      params: {
+        user_id: userId,
+        limit: 100
       }
-    };
-    
-    // 按顺序尝试不同的参数组合
-    for (const params of paramOptions) {
-      const result = await tryFetchWithParams(params);
-      if (result !== null) { // 请求成功
-        if (result.length > 0) {
-          practiceHistory = result;
-          found = true;
-          console.log(`使用${Object.keys(params)[0]}参数成功获取到记录，数量:`, practiceHistory.length);
-          break; // 找到数据后停止尝试
-        }
-      } else {
-        console.log(`使用${Object.keys(params)[0]}参数的请求失败，继续尝试下一种`);
+    })
+
+    let practiceHistory = []
+    if (Array.isArray(response?.data?.list)) {
+      practiceHistory = response.data.list
+    } else if (Array.isArray(response?.data?.data?.list)) {
+      practiceHistory = response.data.data.list
+    } else if (Array.isArray(response?.data)) {
+      practiceHistory = response.data
+    } else if (Array.isArray(response?.list)) {
+      practiceHistory = response.list
+    } else if (Array.isArray(response)) {
+      practiceHistory = response
+    }
+
+    const normalizedRecords = practiceHistory.map(record => ({
+      ...record,
+      knowledge_name: record?.knowledge_name || record?.knowledge_id || '综合练习'
+    }))
+
+    let totalQuestions = 0
+    let totalCorrect = 0
+
+    const learningRecords = normalizedRecords.map(record => {
+      const questionsCount = Number(record?.total_questions) || (Array.isArray(record?.questions) ? record.questions.length : 0)
+      const accuracyValue = typeof record?.accuracy === 'number'
+        ? (record.accuracy > 1 ? record.accuracy / 100 : record.accuracy)
+        : 0
+      const correctCount = Math.round(questionsCount * accuracyValue)
+
+      totalQuestions += questionsCount
+      totalCorrect += correctCount
+
+      return {
+        contentType: 'question',
+        contentName: `答题练习 - ${record?.knowledge_name || record?.knowledge_id || '综合练习'}`,
+        accessTime: record?.submit_time || record?.created_at || record?.timestamp || new Date().toISOString(),
+        duration: Math.round((record?.time_spent ?? record?.duration ?? 0) / 60),
+        score: questionsCount > 0 ? Math.round((correctCount / questionsCount) * 100) : 0,
+        totalQuestions: questionsCount,
+        correctQuestions: correctCount
       }
-    }
-    
-    // 如果有参数的请求都失败或没有数据，尝试不带参数的请求
-    if (!found || practiceHistory.length === 0) {
-      try {
-        console.log(`尝试不带参数获取答题记录`);
-        const response = await request.get('/api/question/record/list');
-        console.log(`不带参数的响应:`, JSON.stringify(response, null, 2));
-        
-        // 应用相同的响应格式处理
-        // 格式1: {data: {code: 200, data: {list: [...]}}}
-        if (response.data && response.data.code === 200 && 
-            response.data.data && Array.isArray(response.data.data.list)) {
-          practiceHistory = response.data.data.list;
-        }
-        // 格式2: {code: 200, data: {list: [...]}}
-        else if (response.code === 200 && response.data && 
-                 Array.isArray(response.data.list)) {
-          practiceHistory = response.data.list;
-        }
-        // 格式3: {data: {code: 200, data: [...]}}
-        else if (response.data && response.data.code === 200 && 
-                 Array.isArray(response.data.data)) {
-          practiceHistory = response.data.data;
-        }
-        // 格式4: {code: 200, data: [...]}
-        else if (response.code === 200 && Array.isArray(response.data)) {
-          practiceHistory = response.data;
-        }
-        // 格式5: {data: [...]}
-        else if (Array.isArray(response.data)) {
-          practiceHistory = response.data;
-        }
-        
-        if (practiceHistory.length > 0) {
-          found = true;
-          console.log(`不带参数成功获取到记录，数量:`, practiceHistory.length);
-          
-          // 如果是不带参数获取的所有记录，尝试根据用户ID过滤
-          if (userId) {
-            const filteredRecords = practiceHistory.filter(record => 
-              record.user_id === userId || 
-              record.userId === userId || 
-              record.id === userId ||
-              record.student_id === userId ||
-              record.studentId === userId
-            );
-            
-            if (filteredRecords.length > 0) {
-              practiceHistory = filteredRecords;
-              console.log(`根据用户ID过滤后，记录数量:`, practiceHistory.length);
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`不带参数请求失败:`, error);
-      }
-    }
-    
-    console.log(`用户${userId}最终获取到的练习记录数量:`, practiceHistory.length);
-    
-    // 转换为学习记录格式并计算统计数据
-    let learningRecords = [];
-    let totalQuestions = 0;
-    let totalCorrect = 0;
-    
-    console.log(`开始处理用户${userId}的答题记录...`);
-    
-    // 直接计算统计数据，不依赖map
-    if (practiceHistory && Array.isArray(practiceHistory)) {
-      console.log(`practiceHistory确实是数组，长度为:`, practiceHistory.length);
-      
-      // 遍历所有记录计算统计数据
-      for (let i = 0; i < practiceHistory.length; i++) {
-        const record = practiceHistory[i];
-        if (!record) continue;
-        
-        console.log(`处理记录${i + 1}:`, JSON.stringify(record, null, 2));
-        
-        // 获取题目数量
-        let questionsCount = 1; // 默认值
-        if (record.total_questions && typeof record.total_questions === 'number') {
-          questionsCount = record.total_questions;
-        } else if (record.questions && Array.isArray(record.questions)) {
-          questionsCount = record.questions.length;
-        } else if (record.count && typeof record.count === 'number') {
-          questionsCount = record.count;
-        }
-        
-        // 计算正确题数
-        let correctCount = 0;
-        
-        // 尝试多种方式计算正确题数
-        // 1. 直接使用accuracy字段
-        if (typeof record.accuracy === 'number') {
-          console.log(`使用accuracy字段:`, record.accuracy);
-          if (record.accuracy === 1) {
-            correctCount = questionsCount; // 100%正确
-          } else if (record.accuracy > 1 && record.accuracy <= 100) {
-            correctCount = Math.round(questionsCount * (record.accuracy / 100));
-          } else if (record.accuracy >= 0 && record.accuracy < 1) {
-            correctCount = Math.round(questionsCount * record.accuracy);
-          }
-        }
-        // 2. 使用正确题数字段
-        else if (record.correct_count && typeof record.correct_count === 'number') {
-          correctCount = record.correct_count;
-        }
-        else if (record.correct_answers && typeof record.correct_answers === 'number') {
-          correctCount = record.correct_answers;
-        }
-        // 3. 从questions数组统计
-        else if (record.questions && Array.isArray(record.questions)) {
-          record.questions.forEach(question => {
-            if (question && (question.is_correct || question.answer_correct === 1 || question.correctness === 1)) {
-              correctCount++;
-            }
-          });
-        }
-        // 4. 从results数组统计
-        else if (record.results && Array.isArray(record.results)) {
-          correctCount = record.results.filter(r => r && (r.is_correct || r.answer_correct === 1 || r.correctness === 1)).length;
-        }
-        // 5. 从answers数组统计
-        else if (record.answers && Array.isArray(record.answers)) {
-          correctCount = record.answers.filter(ans => ans && (ans.is_correct || ans.correct)).length;
-        }
-        // 6. 单题记录格式
-        else if ((record.question_id || record.questionId || record.id) && 
-                 (record.is_correct || record.answer_correct === 1 || record.correctness === 1)) {
-          correctCount = 1;
-        }
-        
-        // 累计统计
-        totalQuestions += questionsCount;
-        totalCorrect += correctCount;
-        
-        // 创建学习记录
-        const score = questionsCount > 0 ? Math.round((correctCount / questionsCount) * 100) : 0;
-        learningRecords.push({
-          contentType: 'question',
-          contentName: `答题练习 - ${record.knowledge_id || record.knowledge_name || record.topic_id || record.topic_name || '综合练习'}`,
-          accessTime: record.submit_time || record.created_at || record.timestamp || record.access_time || new Date().toISOString(),
-          duration: Math.round((record.time_spent || record.duration || record.learning_time || 0) / 60),
-          score: score,
-          totalQuestions: questionsCount,
-          correctQuestions: correctCount
-        });
-      }
-    } else {
-      console.warn(`practiceHistory不是数组，类型:`, typeof practiceHistory);
-    }
-    
-    // 清理重复日志，保留关键调试信息
-    console.log(`用户${userId}答题记录数量:`, practiceHistory?.length || 0);
-    console.log(`用户${userId}答题统计: 题目数=${totalQuestions}, 正确数=${totalCorrect}, 正确率=${totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0}%`);
-    
-    // 如果仍然没有数据，尝试使用模拟数据作为最后手段
-    if (totalQuestions === 0 && userId === 2) {
-      console.warn(`用户2没有获取到真实数据，使用模拟数据进行测试`);
-      // 模拟数据 - 假设有5道题，3道正确
-      totalQuestions = 5;
-      totalCorrect = 3;
-      
-      // 添加详细的模拟答题记录
-      practiceHistory = [
-        {
-          knowledge_id: 'knowledge1',
-          knowledge_name: 'Python基础',
-          submit_time: new Date(Date.now() - 86400000).toISOString(), // 昨天
-          time_spent: 300, // 5分钟
-          total_questions: 2,
-          correct_count: 2,
-          accuracy: 100
-        },
-        {
-          knowledge_id: 'knowledge2', 
-          knowledge_name: '数据结构',
-          submit_time: new Date(Date.now() - 172800000).toISOString(), // 前天
-          time_spent: 600, // 10分钟
-          total_questions: 3,
-          correct_count: 1,
-          accuracy: 33
-        }
-      ];
-      
-      // 为每个模拟记录创建学习记录
-      practiceHistory.forEach(record => {
-        const score = record.accuracy || 0;
-        learningRecords.push({
-          contentType: 'question',
-          contentName: `答题练习 - ${record.knowledge_name || '综合练习'}`,
-          accessTime: record.submit_time,
-          duration: Math.round(record.time_spent / 60),
-          score: score,
-          totalQuestions: record.total_questions,
-          correctQuestions: record.correct_count
-        });
-      });
-      
-      console.log(`已设置模拟数据: 题目数=${totalQuestions}, 正确数=${totalCorrect}, 详细记录数=${practiceHistory.length}`);
-    }
-    
-    // 返回与调用方期望一致的数据结构
+    })
+
     return {
       totalQuestions,
       totalCorrect,
       accuracyRate: totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0,
-      records: practiceHistory || [],
-      learningRecords: learningRecords || []
-    };
+      records: normalizedRecords,
+      learningRecords
+    }
   } catch (error) {
-    console.error(`获取用户${userId}的答题记录失败:`, error);
-    ElMessage.error('获取学生答题记录失败');
+    console.error(`获取用户${userId}的答题记录失败:`, error)
+    ElMessage.error('获取学生答题记录失败')
     return {
-      learningRecords: [],
       totalQuestions: 0,
       totalCorrect: 0,
-      accuracyRate: 0
-    };
+      accuracyRate: 0,
+      records: [],
+      learningRecords: []
+    }
   }
 }
 
@@ -726,60 +513,54 @@ const formatDate = (dateString) => {
 
 // 计算答题记录中的题目数量
 const getQuestionCount = (record) => {
-  if (!record) return 0;
-  if (record.total_questions && typeof record.total_questions === 'number') {
-    return record.total_questions;
-  } else if (record.questions && Array.isArray(record.questions)) {
-    return record.questions.length;
-  } else if (record.count && typeof record.count === 'number') {
-    return record.count;
+  if (!record) return 0
+  if (typeof record.total_questions === 'number') {
+    return record.total_questions
   }
-  return 1; // 默认值
+  if (Array.isArray(record.questions)) {
+    return record.questions.length
+  }
+  if (typeof record.count === 'number') {
+    return record.count
+  }
+  return 0
 }
 
 // 计算答题记录中的正确题数
 const getCorrectCount = (record) => {
-  if (!record) return 0;
-  
-  let correctCount = 0;
-  const questionsCount = getQuestionCount(record);
-  
-  // 尝试多种方式计算正确题数
-  if (typeof record.accuracy === 'number') {
-    if (record.accuracy === 1) {
-      correctCount = questionsCount;
-    } else if (record.accuracy > 1 && record.accuracy <= 100) {
-      correctCount = Math.round(questionsCount * (record.accuracy / 100));
-    } else if (record.accuracy >= 0 && record.accuracy < 1) {
-      correctCount = Math.round(questionsCount * record.accuracy);
-    }
-  } else if (record.correct_count && typeof record.correct_count === 'number') {
-    correctCount = record.correct_count;
-  } else if (record.correct_answers && typeof record.correct_answers === 'number') {
-    correctCount = record.correct_answers;
-  } else if (record.questions && Array.isArray(record.questions)) {
-    correctCount = record.questions.filter(q => q && (q.is_correct || q.answer_correct === 1 || q.correctness === 1)).length;
-  } else if (record.results && Array.isArray(record.results)) {
-    correctCount = record.results.filter(r => r && (r.is_correct || r.answer_correct === 1 || r.correctness === 1)).length;
-  } else if (record.answers && Array.isArray(record.answers)) {
-    correctCount = record.answers.filter(ans => ans && (ans.is_correct || ans.correct)).length;
-  } else if ((record.question_id || record.questionId || record.id) && 
-             (record.is_correct || record.answer_correct === 1 || record.correctness === 1)) {
-    correctCount = 1;
+  if (!record) return 0
+
+  const questionsCount = getQuestionCount(record)
+  if (questionsCount === 0) return 0
+
+  if (typeof record.correct_count === 'number') {
+    return record.correct_count
   }
-  
-  return correctCount;
+  if (typeof record.correct_answers === 'number') {
+    return record.correct_answers
+  }
+  if (Array.isArray(record.results)) {
+    return record.results.filter(r => r && (r.is_correct || r.answer_correct === 1 || r.correctness === 1)).length
+  }
+  if (Array.isArray(record.questions)) {
+    return record.questions.filter(q => q && (q.is_correct || q.answer_correct === 1 || q.correctness === 1)).length
+  }
+  if (typeof record.accuracy === 'number') {
+    const accuracyValue = record.accuracy > 1 ? record.accuracy / 100 : record.accuracy
+    return Math.round(questionsCount * accuracyValue)
+  }
+  return 0
 }
 
 // 计算答题记录的正确率
 const getAccuracyRate = (record) => {
-  if (!record) return 0;
-  
-  const questionsCount = getQuestionCount(record);
-  if (questionsCount === 0) return 0;
-  
-  const correctCount = getCorrectCount(record);
-  return Math.round((correctCount / questionsCount) * 100);
+  if (!record) return 0
+
+  const questionsCount = getQuestionCount(record)
+  if (questionsCount === 0) return 0
+
+  const correctCount = getCorrectCount(record)
+  return Math.round((correctCount / questionsCount) * 100)
 }
 </script>
 

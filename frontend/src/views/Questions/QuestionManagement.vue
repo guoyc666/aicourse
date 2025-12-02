@@ -46,7 +46,7 @@
       </el-table-column>
       <el-table-column prop="knowledge_id" label="知识点" min-width="150">
         <template #default="scope">
-          <div v-for="(kid, index) in scope.row.knowledge_id" :key="index" class="knowledge-tag">
+          <div v-for="(kid, index) in scope.row.knowledge_id" :key="`knowledge_${index}_${kid}`" class="knowledge-tag">
             {{ getKnowledgeName(kid) }}
           </div>
         </template>
@@ -102,9 +102,17 @@
             <el-radio label="code">编程题</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item v-if="createForm.type === 'code'" label="编程语言" prop="code_language">
+          <el-select v-model="createForm.code_language" placeholder="选择编程语言" style="width: 200px" @change="handleLanguageChange('create')">
+            <el-option label="Python" value="python" />
+            <el-option label="C" value="c" />
+            <el-option label="C++" value="cpp" />
+            <el-option label="Java" value="java" />
+          </el-select>
+        </el-form-item>
         <el-form-item v-if="createForm.type === 'choice'" label="选项" prop="options">
           <div class="options-container">
-            <div v-for="(option, index) in createForm.optionsList" :key="index" class="option-item">
+            <div v-for="(option, index) in createForm.optionsList" :key="`create_option_${index}_${option.value}`" class="option-item">
               <el-input v-model="option.value" placeholder="选项内容" prefix-icon="el-icon-circle-check" />
               <el-button type="danger" icon="el-icon-delete" circle size="small" @click="removeOption(index)" />
             </div>
@@ -112,7 +120,7 @@
           </div>
         </el-form-item>
         <el-form-item label="正确答案" prop="answer">
-          <el-input v-model="createForm.answer" placeholder="请输入正确答案" />
+          <el-input v-model="createForm.answer" :placeholder="createForm.type === 'code' ? '可填写参考说明或函数签名（学生答案以代码为准）' : '请输入正确答案'" />
           <div v-if="createForm.type === 'choice'" class="hint">提示：请输入选项字母（如A、B、C、D）</div>
         </el-form-item>
         <el-form-item label="知识点" prop="knowledge_id">
@@ -126,6 +134,41 @@
             <span style="margin-left: 10px;">{{ Math.round((createForm.difficulty || 0) * 100) }}%</span>
           </div>
           <div class="hint">（0%表示最简单，100%表示最难）</div>
+        </el-form-item>
+        <el-form-item v-if="createForm.type === 'code'" label="测试用例">
+          <div class="code-examples-container">
+            <div
+              v-for="(example, index) in createForm.codeExamples"
+              :key="`create_example_${index}_${example.input}_${example.output}`"
+              class="code-example-item"
+            >
+              <el-input
+                v-model="example.input"
+                type="textarea"
+                :rows="2"
+                placeholder="输入示例（作为 solve(input_str) 的参数 input_str）"
+                class="code-example-input"
+              />
+              <el-input
+                v-model="example.output"
+                type="textarea"
+                :rows="2"
+                placeholder="期望输出（将与 solve 返回值的字符串进行精确比较）"
+                class="code-example-output"
+              />
+              <el-button
+                type="danger"
+                icon="el-icon-delete"
+                circle
+                size="small"
+                @click="removeCreateCodeExample(index)"
+              />
+            </div>
+            <el-button type="primary" link @click="addCreateCodeExample">添加测试用例</el-button>
+            <div class="hint">
+              {{ getLanguageHint(createForm.code_language) }}
+            </div>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -149,9 +192,17 @@
             <el-radio label="code">编程题</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item v-if="editForm.type === 'code'" label="编程语言" prop="code_language">
+          <el-select v-model="editForm.code_language" placeholder="选择编程语言" style="width: 200px" @change="handleLanguageChange('edit')">
+            <el-option label="Python" value="python" />
+            <el-option label="C" value="c" />
+            <el-option label="C++" value="cpp" />
+            <el-option label="Java" value="java" />
+          </el-select>
+        </el-form-item>
         <el-form-item v-if="editForm.type === 'choice'" label="选项" prop="options">
           <div class="options-container">
-            <div v-for="(option, index) in editForm.optionsList" :key="index" class="option-item">
+            <div v-for="(option, index) in editForm.optionsList" :key="`edit_option_${index}_${option.value}`" class="option-item">
               <el-input v-model="option.value" placeholder="选项内容" prefix-icon="el-icon-circle-check" />
               <el-button type="danger" icon="el-icon-delete" circle size="small" @click="removeEditOption(index)" />
             </div>
@@ -159,7 +210,7 @@
           </div>
         </el-form-item>
         <el-form-item label="正确答案" prop="answer">
-          <el-input v-model="editForm.answer" placeholder="请输入正确答案" />
+          <el-input v-model="editForm.answer" :placeholder="editForm.type === 'code' ? '可填写参考说明或函数签名（学生答案以代码为准）' : '请输入正确答案'" />
           <div v-if="editForm.type === 'choice'" class="hint">提示：请输入选项字母（如A、B、C、D）</div>
         </el-form-item>
         <el-form-item label="知识点" prop="knowledge_id">
@@ -173,6 +224,41 @@
             <span style="margin-left: 10px;">{{ Math.round((editForm.difficulty || 0) * 100) }}%</span>
           </div>
           <div class="hint">0%表示最简单，100%表示最难</div>
+        </el-form-item>
+        <el-form-item v-if="editForm.type === 'code'" label="测试用例">
+          <div class="code-examples-container">
+            <div
+              v-for="(example, index) in editForm.codeExamples"
+              :key="`edit_example_${index}_${example.input}_${example.output}`"
+              class="code-example-item"
+            >
+              <el-input
+                v-model="example.input"
+                type="textarea"
+                :rows="2"
+                placeholder="输入示例（作为 solve(input_str) 的参数 input_str）"
+                class="code-example-input"
+              />
+              <el-input
+                v-model="example.output"
+                type="textarea"
+                :rows="2"
+                placeholder="期望输出（将与 solve 返回值的字符串进行精确比较）"
+                class="code-example-output"
+              />
+              <el-button
+                type="danger"
+                icon="el-icon-delete"
+                circle
+                size="small"
+                @click="removeEditCodeExample(index)"
+              />
+            </div>
+            <el-button type="primary" link @click="addEditCodeExample">添加测试用例</el-button>
+            <div class="hint">
+              {{ getLanguageHint(editForm.code_language) }}
+            </div>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -217,7 +303,11 @@ const createForm = reactive({
   answer: '',
   knowledge_id: [],
   difficulty: 0.5,
-  difficultyDisplay: 3 // 默认3星
+  difficultyDisplay: 3, // 默认3星
+  code_language: '', // 不设置默认值
+  codeExamples: [
+    { input: '', output: '' }
+  ]
 })
 
 // 编辑题目表单
@@ -230,7 +320,11 @@ const editForm = reactive({
   answer: '',
   knowledge_id: [],
   difficulty: 0.5,
-  difficultyDisplay: 3 // 默认3星
+  difficultyDisplay: 3, // 默认3星
+  code_language: '', // 不设置默认值
+  codeExamples: [
+    { input: '', output: '' }
+  ]
 })
 
 // 表单验证规则
@@ -281,10 +375,33 @@ const loadKnowledgeNodes = async () => {
     const data = await getKnowledgeNodes()
     console.log('获取知识点列表响应:', data)
     if (data.code === 200) {
-      knowledgeNodes.value = data.data || []
+      // 数据验证和清理，确保每个知识点都有有效的ID和名称
+      const validNodes = (data.data || []).filter(node => {
+        // 过滤掉无效的节点（ID为空、undefined、null或0）
+        const isValid = node && 
+                       node.id !== null && 
+                       node.id !== undefined && 
+                       node.id !== '' && 
+                       node.id !== 0 &&
+                       node.name &&
+                       typeof node.name === 'string'
+        return isValid
+      }).map(node => ({
+        id: String(node.id), // 确保ID是字符串类型
+        name: node.name || String(node.id), // 如果name为空，使用id作为name
+        description: node.description || '',
+        node_type: node.node_type || 'concept',
+        level: node.level || 1,
+        question_count: node.question_count || 0
+      }))
+      
+      console.log('过滤后的知识点列表:', validNodes)
+      knowledgeNodes.value = validNodes
     }
   } catch (error) {
     console.error('获取知识点列表失败:', error)
+    // 如果获取失败，设置默认的空数组
+    knowledgeNodes.value = []
   }
 }
 
@@ -321,6 +438,8 @@ const showCreateDialog = () => {
   createForm.answer = ''
   createForm.knowledge_id = []
   createForm.difficulty = 0.5
+  createForm.difficultyDisplay = 3
+  createForm.codeExamples = [{ input: '', output: '' }]
   createDialogVisible.value = true
 }
 
@@ -343,6 +462,30 @@ const showEditDialog = (question) => {
   editForm.knowledge_id = question.knowledge_id || []
   editForm.difficulty = question.difficulty || 0.5
   editForm.difficultyDisplay = Math.round((question.difficulty || 0.5) * 5) // 转换为1-5星星
+  editForm.code_language = question.code_language || '' // 不设置默认值
+  
+  // 处理编程题测试用例
+  if (question.type === 'code') {
+    try {
+      if (question.code_examples) {
+        const examples = JSON.parse(question.code_examples)
+        editForm.codeExamples = Array.isArray(examples) && examples.length > 0 
+          ? examples.map(ex => ({
+              input: ex.input || '',
+              output: ex.output || ''
+            }))
+          : [{ input: '', output: '' }]
+      } else {
+        editForm.codeExamples = [{ input: '', output: '' }]
+      }
+    } catch (error) {
+      console.error('解析测试用例失败:', error)
+      editForm.codeExamples = [{ input: '', output: '' }]
+    }
+  } else {
+    editForm.codeExamples = [{ input: '', output: '' }]
+  }
+  
   editDialogVisible.value = true
 }
 
@@ -353,6 +496,9 @@ const handleTypeChange = () => {
   } else if (createForm.optionsList.length === 0) {
     createForm.optionsList = [{ value: '' }, { value: '' }]
   }
+  if (createForm.type === 'code' && (!createForm.codeExamples || createForm.codeExamples.length === 0)) {
+    createForm.codeExamples = [{ input: '', output: '' }]
+  }
 }
 
 // 处理题目类型变化（编辑）
@@ -362,6 +508,65 @@ const handleEditTypeChange = () => {
   } else if (editForm.optionsList.length === 0) {
     editForm.optionsList = [{ value: '' }, { value: '' }]
   }
+  if (editForm.type === 'code' && (!editForm.codeExamples || editForm.codeExamples.length === 0)) {
+    editForm.codeExamples = [{ input: '', output: '' }]
+  }
+}
+
+// 获取编程语言提示信息
+const getLanguageHint = (codeLanguage) => {
+  const hints = {
+    python: '学生需要在答案中实现函数 solve(input_str: str) -> str，所有测试用例的输出都匹配才判定为正确。',
+    c: '学生需要在答案中实现函数 solve(input_str) -> str（使用char*），所有测试用例的输出都匹配才判定为正确。',
+    cpp: '学生需要在答案中实现函数 solve(input_str) -> std::string，所有测试用例的输出都匹配才判定为正确。',
+    java: '学生需要在答案中实现类中的solve(input_str) -> String方法，所有测试用例的输出都匹配才判定为正确。'
+  }
+  
+  // 处理枚举值格式（如 "CodeLanguage.java"）
+  if (codeLanguage && typeof codeLanguage === 'string') {
+    let languageKey = codeLanguage
+    // 如果包含点号，提取枚举值部分
+    if (codeLanguage.includes('.')) {
+      languageKey = codeLanguage.split('.').pop()
+      console.log(`处理枚举值提示: ${codeLanguage} -> ${languageKey}`)
+    }
+    return hints[languageKey] || hints.python
+  }
+  
+  return hints.python
+}
+
+// 处理编程语言变化
+const handleLanguageChange = (formType) => {
+  const form = formType === 'create' ? createForm : editForm
+  const codeLanguage = form.code_language
+  console.log(`切换到${formType}表单的${codeLanguage}语言提示`)
+}
+
+// 编程题测试用例（创建）
+const addCreateCodeExample = () => {
+  createForm.codeExamples.push({ input: '', output: '' })
+}
+
+const removeCreateCodeExample = (index) => {
+  if (createForm.codeExamples.length <= 1) {
+    ElMessage.warning('至少需要一个测试用例')
+    return
+  }
+  createForm.codeExamples.splice(index, 1)
+}
+
+// 编程题测试用例（编辑）
+const addEditCodeExample = () => {
+  editForm.codeExamples.push({ input: '', output: '' })
+}
+
+const removeEditCodeExample = (index) => {
+  if (editForm.codeExamples.length <= 1) {
+    ElMessage.warning('至少需要一个测试用例')
+    return
+  }
+  editForm.codeExamples.splice(index, 1)
 }
 
 // 添加选项（创建）
@@ -416,8 +621,26 @@ const handleCreateQuestion = async () => {
       formData.append('options', options)
     }
     formData.append('answer', createForm.answer)
+    // 编程题测试用例
+    if (createForm.type === 'code') {
+      const examples = (createForm.codeExamples || [])
+        .map(ex => ({
+          input: (ex.input || '').trim(),
+          output: (ex.output || '').trim()
+        }))
+        .filter(ex => ex.input !== '' && ex.output !== '')
+      if (examples.length === 0) {
+        ElMessage.warning('请至少填写一个完整的测试用例（输入和输出都不能为空）')
+        return
+      }
+      formData.append('code_examples', JSON.stringify(examples))
+    }
     formData.append('knowledge_id', JSON.stringify(createForm.knowledge_id))
     formData.append('difficulty', createForm.difficulty.toString())
+    // 编程题添加编程语言字段（仅在有值时才提交）
+    if (createForm.type === 'code' && createForm.code_language) {
+      formData.append('code_language', createForm.code_language)
+    }
 
     const data = await addQuestion(formData)
     console.log('添加题目响应:', data)
@@ -458,8 +681,26 @@ const handleUpdateQuestion = async () => {
       formData.append('options', options)
     }
     formData.append('answer', editForm.answer)
+    // 编程题测试用例
+    if (editForm.type === 'code') {
+      const examples = (editForm.codeExamples || [])
+        .map(ex => ({
+          input: (ex.input || '').trim(),
+          output: (ex.output || '').trim()
+        }))
+        .filter(ex => ex.input !== '' && ex.output !== '')
+      if (examples.length === 0) {
+        ElMessage.warning('请至少填写一个完整的测试用例（输入和输出都不能为空）')
+        return
+      }
+      formData.append('code_examples', JSON.stringify(examples))
+    }
     formData.append('knowledge_id', JSON.stringify(editForm.knowledge_id))
     formData.append('difficulty', editForm.difficulty.toString())
+    // 编程题添加编程语言字段（仅在有值时才提交）
+    if (editForm.type === 'code' && editForm.code_language) {
+      formData.append('code_language', editForm.code_language)
+    }
 
     // 这里应该调用更新接口，但目前后端没有提供更新接口，可以先删除再创建
     await deleteQuestion(editForm.question_id)

@@ -6,7 +6,8 @@ import request from './request'
  * @param {string} data.text - 题目内容
  * @param {string} data.type - 题目类型(choice/fill/code)
  * @param {string} [data.options] - 选项(JSON格式，仅选择题)
- * @param {string} data.answer - 正确答案
+ * @param {string} data.answer - 正确答案（编程题可为参考说明）
+ * @param {string} [data.code_examples] - 编程题测试用例(JSON数组，每项包含input和output)
  * @param {string} data.knowledge_id - 知识点ID列表(JSON格式)
  * @param {number} [data.difficulty] - 难度系数(0-1)
  * @returns {Promise} 返回添加结果
@@ -282,56 +283,7 @@ export const getLearningStats = async () => {
  * @returns {Promise} 返回知识点列表
  */
 export const getKnowledgeNodes = () => {
-  // 这里可以调用实际的知识点接口，暂时返回模拟数据
-  return Promise.resolve({
-    data: {
-      code: 200,
-      data: [
-        {
-          id: '1',
-          name: 'Python基础语法',
-          description: 'Python编程语言的基础语法知识',
-          node_type: 'concept',
-          level: 1
-        },
-        {
-          id: '2', 
-          name: '变量和数据类型',
-          description: 'Python中的变量定义和基本数据类型',
-          node_type: 'concept',
-          level: 1
-        },
-        {
-          id: '3',
-          name: '控制流程',
-          description: '条件语句和循环语句的使用',
-          node_type: 'skill',
-          level: 2
-        },
-        {
-          id: '4',
-          name: '函数定义',
-          description: '如何定义和调用函数',
-          node_type: 'skill',
-          level: 2
-        },
-        {
-          id: '5',
-          name: '数据结构',
-          description: '列表、字典、元组等数据结构',
-          node_type: 'concept',
-          level: 2
-        },
-        {
-          id: '6',
-          name: '面向对象编程',
-          description: '类和对象的概念及使用',
-          node_type: 'skill',
-          level: 3
-        }
-      ]
-    }
-  })
+  return request.get('/api/question/knowledge/list')
 }
 
 /**

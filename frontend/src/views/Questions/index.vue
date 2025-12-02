@@ -4,7 +4,6 @@
     <div class="page-header">
       <div class="page-title">
         <h2>题库与练习</h2>
-        <p>根据知识点进行针对性练习，提升你的编程能力</p>
       </div>
       <div>
         <el-button type="primary" @click="showQuickPracticeDialog = true">
@@ -261,15 +260,24 @@
             
             <!-- 编程题 -->
             <div v-else-if="currentQuestion.type === 'code'" class="question-code">
+              <!-- 显示编程语言 -->
+              <div class="code-language-tag">
+                <el-tag type="success" size="small">
+                  <el-icon><Document /></el-icon>
+                  编程语言: {{ getCodeLanguageName(currentQuestion.code_language) }}
+                </el-tag>
+              </div>
               <el-input
                 v-model="selectedAnswer"
                 type="textarea"
                 :rows="10"
-                placeholder="请输入代码"
+                :placeholder="getCodePlaceholder(currentQuestion.code_language)"
                 class="code-editor"
                 clearable
               />
-              <div class="code-tips">请确保代码能够正确运行</div>
+              <div class="code-tips">
+                {{ getCodeTips(currentQuestion.code_language) }}
+              </div>
             </div>
           </div>
         </div>
@@ -428,7 +436,7 @@
         <div class="questions-detail">
           <div 
             v-for="(question, index) in currentDetail.questions" 
-            :key="index"
+            :key="`detail_question_${index}_${question.id}_${question.type}`"
             class="detail-question-item"
             :class="{ correct: question.is_correct, incorrect: !question.is_correct }"
           >
@@ -441,6 +449,13 @@
             
             <div class="question-content">
               <div class="question-text">{{ question.text }}</div>
+              <!-- 编程题显示编程语言 -->
+              <div v-if="question.type === 'code'" class="question-language">
+                <el-tag type="success" size="small">
+                  <el-icon><Document /></el-icon>
+                  编程语言: {{ getCodeLanguageName(question.code_language) }}
+                </el-tag>
+              </div>
             </div>
             
             <!-- 选择题详情 -->
@@ -460,6 +475,42 @@
                   <span class="option-text">{{ value }}</span>
                 </div>
               </template>
+            </div>
+
+            <!-- 编程题详情 -->
+            <div v-if="question.type === 'code'" class="code-question-detail">
+              <div class="code-question-header">
+                <el-tag type="info" size="small">编程题</el-tag>
+              </div>
+              
+              <!-- 编程题代码展示 -->
+              <div class="code-content">
+                <div class="code-label">你的代码：</div>
+                <div class="code-block" :class="{ 'error-code': !question.is_correct }">
+                  <pre>{{ question.student_answer || '未提交代码' }}</pre>
+                </div>
+              </div>
+              
+              <!-- 编程题错误信息 -->
+              <div v-if="!question.is_correct && question.code_error" class="code-error-info">
+                <div class="error-title">
+                  <el-icon><Warning /></el-icon>
+                  代码执行错误
+                </div>
+                <div class="error-content">
+                  <div class="error-message">{{ getCodeErrorMessage(question.code_error) }}</div>
+                  <div v-if="question.error_details" class="error-details">
+                    <pre>{{ question.error_details }}</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 填空题详情 -->
+            <div v-if="question.type === 'fill'" class="fill-question-detail">
+              <div class="fill-question-header">
+                <el-tag type="warning" size="small">填空题</el-tag>
+              </div>
             </div>
             
             <!-- 答案对比 -->
@@ -486,7 +537,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { EditPen, Document, Check, CircleCheck, TrendCharts, Collection, Refresh, Calendar, Timer } from '@element-plus/icons-vue'
+import { EditPen, Document, Check, CircleCheck, TrendCharts, Collection, Refresh, Calendar, Timer, Warning } from '@element-plus/icons-vue'
 import { getPracticeQuestions, submitQuestionAnswer, getLearningStats, getKnowledgeNodes, getPracticeHistory, getPracticeDetail, getKnowledgeMastery } from '@/api/questions'
 
 // 响应式数据
@@ -609,8 +660,19 @@ const getNodeTypeTag = (type) => {
 
 // 获取题目数量
 const getQuestionCount = (nodeId) => {
-  // 模拟数据，实际应该从API获取
-  return Math.floor(Math.random() * 20) + 5
+  if (!nodeId) return 0
+  const node = knowledgeNodes.value.find(item => item.id === nodeId)
+  if (!node) return 0
+  if (typeof node.question_count === 'number') {
+    return node.question_count
+  }
+  if (typeof node.questionCount === 'number') {
+    return node.questionCount
+  }
+  if (node.statistics && typeof node.statistics.question_count === 'number') {
+    return node.statistics.question_count
+  }
+  return 0
 }
 
 // 获取节点进度
@@ -722,8 +784,97 @@ const formatAnswer = (question) => {
       return `${question.correct_answer}. ${optionText}`
     }
     return question.correct_answer
+  } else if (question.type === 'code') {
+    return '代码已提交，请查看代码执行结果'
   }
   return question.correct_answer
+}
+
+// 获取编程题代码编辑器占位符文本
+const getCodePlaceholder = (codeLanguage) => {
+  const placeholders = {
+    'python': '请在此编写 Python 代码，并实现函数：solve(input_str: str) -> str',
+    'c': '请在此编写 C 代码，并实现函数：char* solve(char* input_str)',
+    'cpp': '请在此编写 C++ 代码，并实现函数：std::string solve(const std::string& input_str)',
+    'java': '请在此编写 Java 代码，并在类中实现方法：public static String solve(String input_str)'
+  }
+  
+  // 处理枚举值格式（如 "CodeLanguage.java"）
+  if (codeLanguage && typeof codeLanguage === 'string') {
+    let languageKey = codeLanguage
+    // 如果包含点号，提取枚举值部分
+    if (codeLanguage.includes('.')) {
+      languageKey = codeLanguage.split('.').pop()
+      
+    }
+    return placeholders[languageKey] || placeholders.python
+  }
+  
+  return placeholders.python
+}
+
+// 获取编程题提示信息
+const getCodeTips = (codeLanguage) => {
+  const tips = {
+    'python': '系统会使用多个隐藏测试用例调用 solve(input_str)，每个用例的返回值与标准输出完全一致时，该编程题才判定为正确。',
+    'c': '系统会使用多个隐藏测试用例调用 solve(input_str)，每个用例的返回值与标准输出完全一致时，该编程题才判定为正确。请使用malloc动态分配内存并返回结果。',
+    'cpp': '系统会使用多个隐藏测试用例调用 solve(input_str)，每个用例的返回值与标准输出完全一致时，该编程题才判定为正确。请使用std::string处理字符串。',
+    'java': '系统会使用多个隐藏测试用例调用 solve(input_str)，每个用例的返回值与标准输出完全一致时，该编程题才判定为正确。请在类中实现静态方法。'
+  }
+  
+  // 处理枚举值格式（如 "CodeLanguage.java"）
+  if (codeLanguage && typeof codeLanguage === 'string') {
+    let languageKey = codeLanguage
+    // 如果包含点号，提取枚举值部分
+    if (codeLanguage.includes('.')) {
+      languageKey = codeLanguage.split('.').pop()
+      
+    }
+    return tips[languageKey] || tips.python
+  }
+  
+  return tips.python
+}
+
+// 获取编程语言名称
+const getCodeLanguageName = (codeLanguage) => {
+  const languageNames = {
+    'python': 'Python',
+    'c': 'C语言',
+    'cpp': 'C++',
+    'java': 'Java'
+  }
+  
+  // 处理枚举值格式（如 "CodeLanguage.java"）
+  if (codeLanguage && typeof codeLanguage === 'string') {
+    // 如果包含点号，提取枚举值部分
+    if (codeLanguage.includes('.')) {
+      const enumValue = codeLanguage.split('.').pop()
+      
+      return languageNames[enumValue] || 'Python'
+    }
+    // 直接使用原始值
+    return languageNames[codeLanguage] || 'Python'
+  }
+  
+  return 'Python'
+}
+
+// 获取编程题错误信息
+const getCodeErrorMessage = (errorCode) => {
+  const errorMessages = {
+    'syntax_error': '语法错误：代码存在语法问题，请检查语法是否正确',
+    'undefined_solve': '未定义solve函数：请确保定义了solve(input_str)函数',
+    'test_case_failed': '测试用例未通过：您的代码未通过某些测试用例，请检查算法逻辑',
+    'runtime_error': '运行时错误：代码执行过程中发生错误，请检查代码逻辑',
+    'timeout_error': '执行超时：代码运行时间超过限制，请优化算法效率',
+    'import_error': '模块导入错误：请检查是否正确导入了所需的模块',
+    'function_error': '函数定义错误：请确保函数名称和参数正确',
+    'input_error': '输入处理错误：请确保正确处理输入参数',
+    'output_error': '输出格式错误：请确保输出格式符合要求'
+  }
+  
+  return errorMessages[errorCode] || `代码执行失败：${errorCode}`
 }
 
 // 加载知识点
@@ -731,7 +882,13 @@ const loadKnowledgeNodes = async () => {
   loading.knowledge = true
   try {
     const response = await getKnowledgeNodes()
-    knowledgeNodes.value = response.data.data || []
+    if (response?.code === 200 && Array.isArray(response.data)) {
+      knowledgeNodes.value = response.data
+    } else if (response?.data?.code === 200 && Array.isArray(response.data.data)) {
+      knowledgeNodes.value = response.data.data
+    } else {
+      knowledgeNodes.value = []
+    }
     
     // 加载每个知识点的掌握度
     for (const node of knowledgeNodes.value) {
@@ -745,51 +902,7 @@ const loadKnowledgeNodes = async () => {
     }
   } catch (error) {
     ElMessage.error('加载知识点失败')
-    // 使用模拟数据
-    knowledgeNodes.value = [
-      {
-        id: '1',
-        name: 'Python基础语法',
-        description: 'Python编程语言的基础语法知识',
-        node_type: 'concept',
-        level: 1
-      },
-      {
-        id: '2',
-        name: '变量和数据类型',
-        description: 'Python中的变量定义和基本数据类型',
-        node_type: 'concept',
-        level: 1
-      },
-      {
-        id: '3',
-        name: '控制流程',
-        description: '条件语句和循环语句的使用',
-        node_type: 'skill',
-        level: 2
-      },
-      {
-        id: '4',
-        name: '函数定义',
-        description: '如何定义和调用函数',
-        node_type: 'skill',
-        level: 2
-      },
-      {
-        id: '5',
-        name: '数据结构',
-        description: '列表、字典、元组等数据结构',
-        node_type: 'concept',
-        level: 2
-      },
-      {
-        id: '6',
-        name: '面向对象编程',
-        description: '类和对象的概念及使用',
-        node_type: 'skill',
-        level: 3
-      }
-    ]
+    knowledgeNodes.value = []
   } finally {
     loading.knowledge = false
   }
@@ -808,30 +921,7 @@ const loadPracticeHistory = async () => {
     // 从错误响应中获取更详细的错误信息
     const errorMsg = error.response?.data?.message || '加载练习历史失败'
     ElMessage.error(errorMsg)
-    // 使用模拟数据
-    practiceHistory.value = [
-      {
-        record_id: 1,
-        submit_time: '2024-01-15 10:30:00',
-        time_spent: 930,
-        accuracy: 0.8,
-        knowledge_id: '1'
-      },
-      {
-        record_id: 2,
-        submit_time: '2024-01-14 15:20:00',
-        time_spent: 735,
-        accuracy: 0.75,
-        knowledge_id: '2'
-      },
-      {
-        record_id: 3,
-        submit_time: '2024-01-13 09:15:00',
-        time_spent: 1125,
-        accuracy: 0.7,
-        knowledge_id: '3'
-      }
-    ]
+    practiceHistory.value = []
   } finally {
     loading.history = false
   }
@@ -955,15 +1045,6 @@ const loadStats = async () => {
       }
     }
     
-    // 如果所有方法都失败，使用模拟数据
-    if (!hasValidStats) {
-      console.log('所有方法都失败，使用模拟统计数据...')
-      stats.totalQuestions = 0     // 按真实数据处理
-      stats.answeredQuestions = 12 // 假设有12道已答题
-      stats.correctAnswers = 8     // 假设有8道正确
-      stats.accuracy = 67          // 计算得到的正确率
-    }
-    
     console.log('最终更新的统计数据:', { ...stats })
     
     // 按真实数据显示总题目数，不再强制设置最小值
@@ -976,14 +1057,6 @@ const loadStats = async () => {
   } catch (error) {
     console.error('加载统计数据失败:', error)
     console.error('错误详情:', error.response || error)
-    
-    // 出错时使用模拟数据
-    stats.totalQuestions = 0     // 按真实数据处理
-    stats.answeredQuestions = 12
-    stats.correctAnswers = 8
-    stats.accuracy = 67
-    
-    console.log('使用错误情况下的模拟统计数据')
   }
 }
 
@@ -1089,7 +1162,9 @@ const loadQuestions = async (knowledgeId) => {
           type: q.type || 'unknown',
           options: safeOptions,
           knowledge_id: safeKnowledgeId,
-          difficulty: q.difficulty || 1
+          difficulty: q.difficulty || 1,
+          // 只保留后端返回的code_language字段，不设置默认值
+          ...(q.code_language !== undefined && { code_language: q.code_language })
         }
         
         processedQuestions.push(processedQ)
@@ -1321,46 +1396,33 @@ const handleClosePractice = () => {
 const viewPracticeDetail = async (record) => {
   loading.detail = true
   try {
+    console.log('请求查看练习详情:', record.record_id)
     const response = await getPracticeDetail(record.record_id)
     console.log('练习详情响应:', response)
+    
     // 直接检查response对象的code属性，因为后端返回的结构是{code, message, data}
     if (response.code === 200) {
       currentDetail.value = response.data
       showDetailDialog.value = true
+    } else if (response.code === 403) {
+      ElMessage.warning('您只能查看自己的练习记录')
+    } else if (response.code === 404) {
+      ElMessage.warning('练习记录不存在或已被删除')
     } else {
       ElMessage.error(response.message || '加载练习详情失败')
     }
   } catch (error) {
-    ElMessage.error('加载练习详情失败')
-    // 使用模拟数据
-    currentDetail.value = {
-      record_id: record.record_id,
-      submit_time: record.submit_time,
-      time_spent: record.time_spent,
-      accuracy: record.accuracy,
-      knowledge_id: record.knowledge_id,
-      questions: [
-        {
-          text: 'Python中定义变量不需要声明数据类型，这是因为Python是一门什么类型的语言？',
-          type: 'choice',
-          options: [{ A: '静态类型' }, { B: '动态类型' }, { C: '强类型' }, { D: '编译型' }],
-          correct_answer: 'B',
-          student_answer: 'B',
-          is_correct: true,
-          correct_rate: 0.9
-        },
-        {
-          text: '在Python中，以下哪个不是基本数据类型？',
-          type: 'choice',
-          options: [{ A: 'int' }, { B: 'str' }, { C: 'list' }, { D: 'float' }],
-          correct_answer: 'C',
-          student_answer: 'B',
-          is_correct: false,
-          correct_rate: 0.7
-        }
-      ]
+    console.error('加载练习详情错误:', error)
+    
+    // 处理不同类型的错误
+    if (error.response?.status === 403) {
+      ElMessage.warning('您只能查看自己的练习记录')
+    } else if (error.response?.status === 404) {
+      ElMessage.warning('练习记录不存在或已被删除')
+    } else {
+      ElMessage.error('加载练习详情失败')
     }
-    showDetailDialog.value = true
+    currentDetail.value = null
   } finally {
     loading.detail = false
   }
@@ -1933,6 +1995,19 @@ onUnmounted(() => {
           line-height: 1.5;
           color: #333;
         }
+        
+        .question-language {
+          margin-top: 8px;
+          
+          .el-tag {
+            font-size: 12px;
+            padding: 4px 8px;
+            
+            .el-icon {
+              margin-right: 4px;
+            }
+          }
+        }
       }
       
       .answer-comparison {
@@ -1977,6 +2052,95 @@ onUnmounted(() => {
               color: #f56c6c;
             }
           }
+        }
+      }
+      
+      // 编程题样式
+      .code-question-detail {
+        .code-question-header {
+          margin-bottom: 12px;
+        }
+        
+        .code-content {
+          margin-bottom: 16px;
+          
+          .code-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+          }
+          
+          .code-block {
+            background-color: #f5f7fa;
+            border: 1px solid #e4e7ed;
+            border-radius: 6px;
+            padding: 12px;
+            overflow-x: auto;
+            
+            pre {
+              margin: 0;
+              font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+              font-size: 13px;
+              line-height: 1.4;
+              color: #333;
+              white-space: pre-wrap;
+              word-wrap: break-word;
+            }
+            
+            &.error-code {
+              border-color: #f56c6c;
+              background-color: #fef0f0;
+            }
+          }
+        }
+        
+        .code-error-info {
+          background-color: #fef0f0;
+          border: 1px solid #f56c6c;
+          border-radius: 6px;
+          padding: 12px;
+          margin-bottom: 16px;
+          
+          .error-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #f56c6c;
+            margin-bottom: 8px;
+          }
+          
+          .error-content {
+            .error-message {
+              font-size: 13px;
+              color: #f56c6c;
+              margin-bottom: 8px;
+            }
+            
+            .error-details {
+              background-color: #fff;
+              border-radius: 4px;
+              padding: 8px;
+              overflow-x: auto;
+              
+              pre {
+                margin: 0;
+                font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                font-size: 12px;
+                line-height: 1.3;
+                color: #666;
+              }
+            }
+          }
+        }
+      }
+      
+      // 填空题样式
+      .fill-question-detail {
+        .fill-question-header {
+          margin-bottom: 12px;
         }
       }
     }

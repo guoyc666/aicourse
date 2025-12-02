@@ -14,7 +14,8 @@ from auth import authenticate_user, create_access_token, get_current_user, verif
 from schemas import UserCreate, UserLogin, UserResponse, Token, RoleResponse, TopicResponse, ReplyResponse
 from routers import auth, users, tasks, topics, ai_assistant, graph, records, progress, mastery, question, file_resources
 
-load_dotenv(".env")
+load_dotenv()
+
 # 创建数据库表
 Base.metadata.create_all(bind=engine)
 
@@ -55,4 +56,3 @@ async def health_check():
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-    

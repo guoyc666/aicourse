@@ -9,14 +9,421 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 
 from database import get_db
-from models import Question, LearningRecord, QuestionRecord, User
-from auth import get_current_user, get_current_active_user
+from models import Question, LearningRecord, QuestionRecord, User, QuestionType, CodeLanguage
+from auth import get_current_user, get_current_active_user, check_role
 
 # 创建路由对象
 router = APIRouter(
     prefix="/api/question",
     tags=["题库"]
 )
+
+# 代码执行辅助类
+class CodeExecutor:
+    """编程题代码执行器，支持多语言"""
+    
+    @staticmethod
+    def _execute_python_code(user_code: str, examples: List[Dict[str, Any]]) -> tuple[bool, Optional[str]]:
+        """执行Python代码"""
+        try:
+            # 在受限环境中执行学生代码
+            # 约定学生代码中需要实现一个名为 solve(input_str: str) -> str 的函数
+            local_env: Dict[str, Any] = {}
+            global_env = {
+                "__builtins__": {
+                    "range": range,
+                    "len": len,
+                    "print": print,
+                    "str": str,
+                    "int": int,
+                    "float": float,
+                    "list": list,
+                    "dict": dict,
+                    "max": max,
+                    "min": min,
+                    "sum": sum,
+                    "abs": abs,
+                    "sorted": sorted,
+                    "enumerate": enumerate,
+                    "zip": zip
+                },
+                "__name__": "__main__"
+            }
+            exec(user_code, global_env, local_env)
+            
+            solve_func = local_env.get("solve") or global_env.get("solve")
+            if not callable(solve_func):
+                return False, "未找到 solve(input_str: str) 函数"
+            
+            # 测试所有用例
+            for ex in examples:
+                ex_input = str(ex.get("input", ""))
+                expected_output = str(ex.get("output", ""))
+                try:
+                    result = solve_func(ex_input)
+                    if result is None:
+                        result_str = ""
+                    else:
+                        result_str = str(result)
+                except Exception as e:
+                    return False, f"运行测试用例时出错: {str(e)}"
+                
+                if result_str != expected_output:
+                    return False, f"测试用例失败：输入'{ex_input}'，期望输出'{expected_output}'，实际输出'{result_str}'"
+            
+            return True, None
+            
+        except Exception as e:
+            return False, f"代码执行错误: {str(e)}"
+    
+    @staticmethod
+    def _execute_c_code(user_code: str, examples: List[Dict[str, Any]]) -> tuple[bool, Optional[str]]:
+        """执行C代码"""
+        import subprocess
+        import tempfile
+        import os
+        import sys
+        
+        def find_gcc():
+            """自动寻找GCC编译器"""
+            import subprocess
+            
+            # 先尝试在PATH中查找
+            try:
+                result = subprocess.run(['where', 'gcc'], capture_output=True, text=True)
+                if result.returncode == 0 and result.stdout.strip():
+                    return result.stdout.strip().split('\n')[0]
+            except:
+                pass
+            
+            # 常见的GCC安装路径
+            common_paths = [
+                'E:/msys64/mingw64/bin/x86_64-w64-mingw32-gcc.exe',
+                'E:/msys64/mingw32/bin/gcc.exe',
+                'C:/mingw64/bin/x86_64-w64-mingw32-gcc.exe',
+                'C:/mingw/bin/gcc.exe',
+                'C:/TDM-GCC-64/bin/gcc.exe',
+                'C:/Program Files/mingw-w64/x86_64-8.1.0-posix-seh-rt_v6-rev0/bin/gcc.exe',
+                '/usr/bin/gcc',  # WSL
+                '/usr/local/bin/gcc',  # macOS/Linux
+            ]
+            
+            # 检查每个路径是否存在
+            for path in common_paths:
+                if os.path.exists(path):
+                    return path
+                    
+            return None
+        
+        try:
+            # 自动寻找GCC编译器
+            gcc_path = find_gcc()
+            if not gcc_path:
+                return False, "未找到C编译器，请安装GCC或将其路径添加到系统PATH中"
+            
+            # 检查用户代码是否包含main函数
+            if "int main(" in user_code or "void main(" in user_code:
+                # 如果用户代码包含main函数，修改为test_main避免冲突
+                modified_user_code = user_code.replace("int main(", "int test_main(").replace("void main(", "void test_main(")
+            else:
+                modified_user_code = user_code
+            
+            # 包装用户代码，使其能够调用solve函数
+            wrapper_code = f'''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// 用户代码
+{modified_user_code}
+
+// 测试主函数
+int main() {{
+    char input[1000];
+    
+    // 从标准输入读取测试用例
+    if (fgets(input, sizeof(input), stdin)) {{
+        // 去除换行符
+        input[strcspn(input, "\\r\\n")] = 0;
+        
+        // 调用solve函数
+        char* result = solve(input);
+        
+        if (result != NULL) {{
+            printf("%s", result);
+            free(result);
+        }} else {{
+            printf("");
+        }}
+    }}
+    
+    return 0;
+}}
+'''
+            
+            # 创建临时C文件
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.c', delete=False, encoding='utf-8') as f:
+                f.write(wrapper_code)
+                c_file = f.name
+            
+            # 编译C代码
+            exe_file = c_file.replace('.c', '.exe')
+            compile_cmd = [gcc_path, c_file, '-o', exe_file]
+            compile_result = subprocess.run(compile_cmd, capture_output=True, text=True, timeout=30)
+            
+            if compile_result.returncode != 0:
+                return False, f"C代码编译失败: {compile_result.stderr}"
+            
+            # 测试所有用例
+            for ex in examples:
+                input_data = str(ex.get("input", ""))
+                expected_output = str(ex.get("output", ""))
+                
+                try:
+                    run_result = subprocess.run([exe_file], 
+                                              input=input_data, 
+                                              capture_output=True, 
+                                              text=True, 
+                                              timeout=10)
+                    actual_output = run_result.stdout.strip()
+                except subprocess.TimeoutExpired:
+                    return False, f"C代码执行超时：输入'{input_data}'"
+                except Exception as e:
+                    return False, f"C代码执行错误：输入'{input_data}', 错误: {str(e)}"
+                
+                if actual_output != expected_output:
+                    return False, f"测试用例失败：输入'{input_data}'，期望输出'{expected_output}'，实际输出'{actual_output}'"
+            
+            return True, None
+            
+        except Exception as e:
+            return False, f"C代码评测异常: {str(e)}"
+        finally:
+            # 清理临时文件
+            try:
+                if 'c_file' in locals():
+                    os.unlink(c_file)
+                if 'exe_file' in locals():
+                    if os.path.exists(exe_file):
+                        os.unlink(exe_file)
+            except:
+                pass
+    
+    @staticmethod
+    def _execute_cpp_code(user_code: str, examples: List[Dict[str, Any]]) -> tuple[bool, Optional[str]]:
+        """执行C++代码"""
+        import subprocess
+        import tempfile
+        import os
+        
+        def find_gpp():
+            """自动寻找G++编译器"""
+            import subprocess
+            
+            # 先尝试在PATH中查找
+            try:
+                result = subprocess.run(['where', 'g++'], capture_output=True, text=True)
+                if result.returncode == 0 and result.stdout.strip():
+                    return result.stdout.strip().split('\n')[0]
+            except:
+                pass
+            
+            # 常见的G++安装路径
+            common_paths = [
+                'E:/msys64/mingw64/bin/x86_64-w64-mingw32-g++.exe',
+                'E:/msys64/mingw32/bin/g++.exe',
+                'C:/mingw64/bin/x86_64-w64-mingw32-g++.exe',
+                'C:/mingw/bin/g++.exe',
+                'C:/TDM-GCC-64/bin/g++.exe',
+                'C:/Program Files/mingw-w64/x86_64-8.1.0-posix-seh-rt_v6-rev0/bin/g++.exe',
+                '/usr/bin/g++',  # WSL
+                '/usr/local/bin/g++',  # macOS/Linux
+            ]
+            
+            # 检查每个路径是否存在
+            for path in common_paths:
+                if os.path.exists(path):
+                    return path
+                    
+            return None
+        
+        try:
+            # 自动寻找G++编译器
+            gpp_path = find_gpp()
+            if not gpp_path:
+                return False, "未找到C++编译器，请安装G++或将其路径添加到系统PATH中"
+            
+            # 检查用户代码是否包含main函数
+            if "int main(" in user_code or "void main(" in user_code or "int main (" in user_code or "void main (" in user_code:
+                # 如果用户代码包含main函数，修改为test_main避免冲突
+                modified_user_code = user_code.replace("int main(", "int test_main(").replace("void main(", "void test_main(")
+                modified_user_code = modified_user_code.replace("int main (", "int test_main (").replace("void main (", "void test_main (")
+            else:
+                modified_user_code = user_code
+            
+            # 包装用户代码，使其能够调用solve函数
+            wrapper_code = f'''
+#include <iostream>
+#include <string>
+#include <cstring>
+#include <cstdlib>
+
+using namespace std;
+
+// 用户代码
+{modified_user_code}
+
+// 测试主函数
+int main() {{
+    string input;
+    
+    // 从标准输入读取测试用例
+    if (getline(cin, input)) {{
+        // 移除换行符
+        if (!input.empty() && (input.back() == '\\n' || input.back() == '\\r')) {{
+            input.pop_back();
+        }}
+        if (!input.empty() && (input.back() == '\\n' || input.back() == '\\r')) {{
+            input.pop_back();
+        }}
+        
+        // 调用solve函数
+        char* result = solve(input.c_str());
+        
+        if (result != nullptr) {{
+            cout << result;
+            free(result);
+        }}
+    }}
+    
+    return 0;
+}}
+'''
+            
+            # 创建临时C++文件
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.cpp', delete=False, encoding='utf-8') as f:
+                f.write(wrapper_code)
+                cpp_file = f.name
+            
+            # 编译C++代码
+            exe_file = cpp_file.replace('.cpp', '.exe')
+            compile_cmd = [gpp_path, cpp_file, '-o', exe_file]
+            compile_result = subprocess.run(compile_cmd, capture_output=True, text=True, timeout=30)
+            
+            if compile_result.returncode != 0:
+                return False, f"C++代码编译失败: {compile_result.stderr}"
+            
+            # 测试所有用例
+            for ex in examples:
+                input_data = str(ex.get("input", ""))
+                expected_output = str(ex.get("output", ""))
+                
+                try:
+                    run_result = subprocess.run([exe_file], 
+                                              input=input_data, 
+                                              capture_output=True, 
+                                              text=True, 
+                                              timeout=10)
+                    actual_output = run_result.stdout.strip()
+                except subprocess.TimeoutExpired:
+                    return False, f"C++代码执行超时：输入'{input_data}'"
+                except Exception as e:
+                    return False, f"C++代码执行错误：输入'{input_data}', 错误: {str(e)}"
+                
+                if actual_output != expected_output:
+                    return False, f"测试用例失败：输入'{input_data}'，期望输出'{expected_output}'，实际输出'{actual_output}'"
+            
+            return True, None
+            
+        except Exception as e:
+            return False, f"C++代码评测异常: {str(e)}"
+        finally:
+            # 清理临时文件
+            try:
+                if 'cpp_file' in locals():
+                    os.unlink(cpp_file)
+                if 'exe_file' in locals():
+                    if os.path.exists(exe_file):
+                        os.unlink(exe_file)
+            except:
+                pass
+    
+    @staticmethod
+    def _execute_java_code(user_code: str, examples: List[Dict[str, Any]]) -> tuple[bool, Optional[str]]:
+        """执行Java代码"""
+        import subprocess
+        import tempfile
+        import os
+        import re
+        
+        try:
+            # 创建临时Java文件，使用UTF-8编码
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.java', delete=False, encoding='utf-8') as f:
+                f.write(user_code)
+                java_file = f.name
+            
+            # 从文件路径中获取文件名（不包含扩展名）作为类名
+            class_name = os.path.splitext(os.path.basename(java_file))[0]
+            
+            # 从Java代码中检查是否有public class声明，如果没有则添加
+            public_class_match = re.search(r'public\s+class\s+(\w+)', user_code)
+            if public_class_match:
+                # 如果有public class，但类名与文件名不匹配，需要修改代码中的类名
+                original_class = public_class_match.group(1)
+                if original_class != class_name:
+                    # 替换类名声明
+                    modified_code = re.sub(
+                        r'public\s+class\s+' + re.escape(original_class),
+                        f'public class {class_name}',
+                        user_code
+                    )
+                    
+                    # 重新写入文件
+                    with open(java_file, 'w', encoding='utf-8') as f:
+                        f.write(modified_code)
+            
+            # 编译Java代码，指定UTF-8编码
+            compile_cmd = ['javac', '-encoding', 'UTF-8', java_file]
+            compile_result = subprocess.run(compile_cmd, capture_output=True, text=True, timeout=30)
+            
+            if compile_result.returncode != 0:
+                return False, f"Java代码编译失败: {compile_result.stderr}"
+            
+            # 测试所有用例
+            for ex in examples:
+                input_data = str(ex.get("input", ""))
+                expected_output = str(ex.get("output", ""))
+                
+                try:
+                    run_result = subprocess.run(['java', '-cp', os.path.dirname(java_file), class_name], 
+                                              input=input_data, 
+                                              capture_output=True, 
+                                              text=True, 
+                                              timeout=10)
+                    actual_output = run_result.stdout.strip()
+                except subprocess.TimeoutExpired:
+                    return False, f"Java代码执行超时：输入'{input_data}'"
+                except Exception as e:
+                    return False, f"Java代码执行错误：输入'{input_data}', 错误: {str(e)}"
+                
+                if actual_output != expected_output:
+                    return False, f"测试用例失败：输入'{input_data}'，期望输出'{expected_output}'，实际输出'{actual_output}'"
+            
+            return True, None
+            
+        except Exception as e:
+            return False, f"Java代码评测异常: {str(e)}"
+        finally:
+            # 清理临时文件
+            try:
+                if 'java_file' in locals():
+                    os.unlink(java_file)
+                    # 删除对应的.class文件
+                    class_file = java_file.replace('.java', '.class')
+                    if os.path.exists(class_file):
+                        os.unlink(class_file)
+            except:
+                pass
 
 # Pydantic模型定义
 class AnswerItem(BaseModel):
@@ -34,7 +441,12 @@ async def add_question(
     text: str = Form(..., description="题目内容"),
     type: str = Form(..., description="题目类型(choice/fill/code)"),
     options: Optional[str] = Form(None, description="选项(JSON格式，仅选择题)"),
-    answer: str = Form(..., description="正确答案"),
+    answer: str = Form(..., description="正确答案（编程题可填写参考说明）"),
+    code_examples: Optional[str] = Form(
+        None,
+        description="编程题测试用例(JSON数组，每项包含input和output字段，仅编程题必填)"
+    ),
+    code_language: Optional[str] = Form("python", description="编程语言类型(python/c/cpp/java，仅编程题有效)"),
     knowledge_id: str = Form(..., description="知识点ID列表(JSON格式)"),
     difficulty: Optional[float] = Form(0.5, description="难度系数(0-1)"),
     current_user: User = Depends(get_current_active_user),  
@@ -47,12 +459,43 @@ async def add_question(
             detail="题目类型必须为choice、fill或code"
         )
     
+    # 验证编程语言类型
+    if type == "code":
+        if code_language not in ["python", "c", "cpp", "java"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="编程语言类型必须为python、c、cpp或java"
+            )
+    else:
+        # 非编程题忽略编程语言字段
+        code_language = "python"
+    
     # 验证选择题选项
     if type == "choice" and not options:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="选择题必须提供选项"
         )
+    
+    # 验证编程题测试用例
+    if type == "code":
+        if not code_examples:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="编程题必须提供测试用例"
+            )
+        try:
+            examples_data = json.loads(code_examples)
+            if not isinstance(examples_data, list) or not examples_data:
+                raise ValueError("测试用例必须为非空列表")
+            for ex in examples_data:
+                if not isinstance(ex, dict) or "input" not in ex or "output" not in ex:
+                    raise ValueError("每个测试用例必须包含input和output字段")
+        except (json.JSONDecodeError, ValueError) as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"测试用例格式错误: {str(e)}"
+            )
     
     # 验证知识点ID列表
     try:
@@ -181,6 +624,8 @@ async def add_question(
             type=type,
             options=options,
             answer=answer,
+            code_examples=code_examples,
+            code_language=code_language,
             knowledge_id=json.dumps(knowledge_ids),
             difficulty=difficulty,
             answer_count=0,
@@ -277,7 +722,9 @@ async def get_question_list(
             "answer": q.answer,
             "knowledge_id": json.loads(q.knowledge_id),
             "difficulty": q.difficulty,
-            "correct_rate": round(correct_rate, 4)
+            "correct_rate": round(correct_rate, 4),
+            "code_examples": q.code_examples,  # 添加编程题测试用例字段
+            "code_language": getattr(q, 'code_language', 'python')  # 添加编程语言字段
         })
     
     return JSONResponse(
@@ -290,6 +737,86 @@ async def get_question_list(
             }
         }
     )
+
+@router.get("/knowledge/list", summary="获取知识点列表")
+async def get_knowledge_nodes(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        questions = db.query(Question).all()
+        knowledge_map: Dict[str, Dict[str, Any]] = {}
+        
+        for question in questions:
+            raw_value = getattr(question, "knowledge_id", None)
+            if not raw_value:
+                continue
+            
+            knowledge_ids = []
+            if isinstance(raw_value, list):
+                knowledge_ids = raw_value
+            else:
+                try:
+                    parsed_value = json.loads(raw_value)
+                    if isinstance(parsed_value, list):
+                        knowledge_ids = parsed_value
+                    else:
+                        knowledge_ids = [parsed_value]
+                except (json.JSONDecodeError, TypeError):
+                    knowledge_ids = [raw_value]
+            
+            for knowledge in knowledge_ids:
+                if knowledge is None:
+                    continue
+                
+                # 过滤掉无效的知识点ID（包括0、空字符串、无效值）
+                try:
+                    knowledge_str = str(knowledge).strip()
+                    if not knowledge_str or knowledge_str == "0" or knowledge_str.lower() == "null":
+                        continue
+                except (ValueError, TypeError):
+                    continue
+                
+                key = knowledge_str
+                if key not in knowledge_map:
+                    knowledge_map[key] = {
+                        "id": key,
+                        "name": key,
+                        "description": "",
+                        "node_type": "concept",
+                        "level": 1,
+                        "question_count": 0
+                    }
+                knowledge_map[key]["question_count"] += 1
+        
+        # 过滤掉无效的知识节点，确保所有返回的数据都是有效的
+        valid_knowledge_list = [
+            item for item in knowledge_map.values()
+            if item["id"] and item["id"] != "0" and item["name"].strip()
+        ]
+        
+        knowledge_list = sorted(
+            valid_knowledge_list,
+            key=lambda item: item["question_count"],
+            reverse=True
+        )
+        
+        return JSONResponse(
+            content={
+                "code": 200,
+                "message": "查询成功",
+                "data": knowledge_list
+            }
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "code": 500,
+                "message": f"获取知识点列表失败: {str(e)}",
+                "data": []
+            }
+        )
 
 # 4. 题目获取接口（学生答题用）
 @router.get("/get", summary="获取题目（学生）")
@@ -359,6 +886,30 @@ async def get_questions_for_student(
                         "difficulty": getattr(q, 'difficulty', 1)
                     }
                     
+                    # 添加编程语言字段 - 对于编程题必须添加
+                    q_type = getattr(q, 'type', 'unknown')
+                    print(f"题目类型检查: {q_type} (原始值: {getattr(q, 'type', 'unknown')})")
+                    
+                    # 检查是否为编程题 - 支持字符串和枚举类型
+                    is_code_question = False
+                    if hasattr(q_type, 'value'):
+                        # 枚举类型
+                        is_code_question = str(q_type.value).lower() == 'code'
+                    else:
+                        # 字符串类型
+                        is_code_question = str(q_type).lower() == 'code'
+                    
+                    print(f"是否为编程题: {is_code_question}")
+                    
+                    if is_code_question:
+                        # 只返回数据库中实际存储的值，不设置默认值
+                        code_lang = getattr(q, 'code_language', None)
+                        if code_lang is not None:
+                            question_dict["code_language"] = str(code_lang)
+                            print(f"编程题添加语言字段: {question_dict['question_id']} -> {question_dict['code_language']}")
+                        else:
+                            print(f"编程题无语言字段: {question_dict['question_id']}")
+                    
                     # 安全处理options字段
                     try:
                         if hasattr(q, 'options') and q.options:
@@ -381,6 +932,7 @@ async def get_questions_for_student(
                     except Exception:
                         pass  # 保持knowledge_id为空列表
                     
+                    print(f"处理完成的题目: {question_dict}")
                     result_list.append(question_dict)
                 except Exception as item_error:
                     print(f"处理单个题目出错: {str(item_error)}")
@@ -450,7 +1002,65 @@ async def submit_answers(
                 )
             
             # 判断答案是否正确
-            is_correct = (item.student_answer == question.answer)
+            is_correct = False
+            code_runtime_error = None
+            
+            # DEBUG: 添加调试信息
+            print(f"DEBUG: question_id={item.question_id}")
+            print(f"DEBUG: question.type={question.type}")
+            print(f"DEBUG: str(question.type)='{str(question.type)}'")
+            print(f"DEBUG: question.type == QuestionType.code: {question.type == 'code'}")
+            print(f"DEBUG: student_answer='{item.student_answer}'")
+            print(f"DEBUG: question.answer='{question.answer}'")
+            
+            # 编程题：根据测试用例运行学生代码判定
+            if question.type == QuestionType.code or question.type == "code":
+                try:
+                    # 解析测试用例
+                    examples = []
+                    if question.code_examples:
+                        try:
+                            examples = json.loads(question.code_examples)
+                            print(f"DEBUG: parsed examples={examples}")
+                        except json.JSONDecodeError as e:
+                            print(f"DEBUG: JSON decode error: {e}")
+                            examples = []
+                    else:
+                        print(f"DEBUG: question.code_examples is None or empty")
+                    
+                    if not examples:
+                        # 没有配置测试用例则认为无法判分，默认错误
+                        print(f"DEBUG: No examples found, setting is_correct=False")
+                        is_correct = False
+                    else:
+                        # 获取编程语言
+                        code_language = getattr(question, 'code_language', 'python')
+                        user_code = item.student_answer or ""
+                        print(f"DEBUG: code_language={code_language}")
+                        print(f"DEBUG: user_code=\"{user_code}\"")
+                        
+                        if code_language == "python":
+                            # Python代码执行
+                            is_correct, code_runtime_error = CodeExecutor._execute_python_code(user_code, examples)
+                        elif code_language == "c":
+                            # C代码执行
+                            is_correct, code_runtime_error = CodeExecutor._execute_c_code(user_code, examples)
+                        elif code_language == "cpp":
+                            # C++代码执行
+                            is_correct, code_runtime_error = CodeExecutor._execute_cpp_code(user_code, examples)
+                        elif code_language == "java":
+                            # Java代码执行
+                            is_correct, code_runtime_error = CodeExecutor._execute_java_code(user_code, examples)
+                        else:
+                            code_runtime_error = f"不支持的编程语言: {code_language}"
+                            is_correct = False
+                            
+                except Exception as e:
+                    code_runtime_error = f"评测过程异常: {str(e)}"
+                    is_correct = False
+            else:
+                # 非编程题：直接比对答案
+                is_correct = (item.student_answer == question.answer)
             
             # 更新题目统计
             question.answer_count += 1
@@ -472,13 +1082,16 @@ async def submit_answers(
                 knowledge_stats[kid].append((is_correct, question.difficulty, 0))
             
             # 记录答题结果
-            results.append({
+            result_item: Dict[str, Any] = {
                 "question_id": item.question_id,
                 "student_answer": item.student_answer,
                 "correct_answer": question.answer,
                 "is_correct": is_correct,
                 "correct_rate": round(correct_rate, 4)
-            })
+            }
+            if (question.type == QuestionType.code or question.type == "code") and code_runtime_error:
+                result_item["code_error"] = code_runtime_error
+            results.append(result_item)
         
         # 计算总体正确率
         correct_count = sum(1 for res in results if res["is_correct"])
@@ -533,19 +1146,41 @@ async def get_answer_records(
     db: Session = Depends(get_db)
 ):
     try:
-        # 如果没有指定user_id，则使用当前用户的id
-        # 如果指定了user_id但与当前用户不匹配，则返回当前用户的记录（避免403错误）
-        actual_user_id = current_user.id
+        # 默认查询当前用户
+        target_user_id = current_user.id
         
-        # 这里可以根据需要添加管理员/教师权限检查，允许查看其他用户的记录
-        # 暂时简化处理，只返回当前登录用户的记录
+        # 如果显式指定了user_id，检查是否有权限查看
+        if user_id is not None:
+            try:
+                user_id = int(user_id)
+            except (TypeError, ValueError):
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "code": 400,
+                        "message": "user_id必须为整数",
+                        "data": {}
+                    }
+                )
+            
+            if user_id != current_user.id:
+                has_teacher_privilege = check_role(db, current_user.id, "teacher")
+                has_admin_privilege = check_role(db, current_user.id, "admin")
+                
+                if has_teacher_privilege or has_admin_privilege:
+                    target_user_id = user_id
+                else:
+                    # 学生尝试查看他人记录时强制回退到自身数据
+                    target_user_id = current_user.id
+            else:
+                target_user_id = user_id
         
         # 验证分页参数
         if limit > 100:
             limit = 100
         
-        # 查询记录，使用当前登录用户的ID
-        query = db.query(QuestionRecord).filter(QuestionRecord.student_id == actual_user_id)
+        # 查询记录
+        query = db.query(QuestionRecord).filter(QuestionRecord.student_id == target_user_id)
         total = query.count()
         records = query.order_by(QuestionRecord.submit_time.desc()).offset(skip).limit(limit).all()
         
@@ -567,6 +1202,7 @@ async def get_answer_records(
             
             result_list.append({
                 "record_id": record.id,
+                "student_id": record.student_id,
                 "submit_time": record.submit_time.strftime("%Y-%m-%d %H:%M:%S"),
                 "time_spent": record.duration,
                 "accuracy": record.accuracy,
@@ -631,7 +1267,8 @@ async def get_answer_record_detail(
     for item in detail:
         q = question_map.get(item["question_id"])
         if q:
-            questions_detail.append({
+            # 构建基础题目信息
+            question_info = {
                 "text": q.text,
                 "type": q.type,
                 "options": json.loads(q.options) if q.options else None,
@@ -641,7 +1278,18 @@ async def get_answer_record_detail(
                 "student_answer": item["student_answer"],
                 "is_correct": item["is_correct"],
                 "correct_rate": item["correct_rate"]
-            })
+            }
+            
+            # 编程题需要包含code_language字段
+            if q.type == "code" and hasattr(q, "code_language"):
+                question_info["code_language"] = q.code_language
+                # 如果有code_error或error_details，也包含进来
+                if "code_error" in item:
+                    question_info["code_error"] = item["code_error"]
+                if "error_details" in item:
+                    question_info["error_details"] = item["error_details"]
+            
+            questions_detail.append(question_info)
     
     # 处理知识点信息
     knowledge_ids = json.loads(record.knowledge_id)
