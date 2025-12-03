@@ -166,12 +166,23 @@ export function trackDocumentResource(resourceId: string, scrollEl: HTMLElement)
   function onClosed() {
     if (!learned) {
       const totalTime = Math.floor((Date.now() - startTime) / 1000);
-      reportProgress({
-        student_id: userStore.user.id,
-        resource_id: resourceId,
-        status: 0,
-        total_time: totalTime,
-      });
+      // 如果停留时间超过10秒也算完成
+      if (totalTime >= 10) {
+        learned = true;
+        reportProgress({
+          student_id: userStore.user.id,
+          resource_id: resourceId,
+          status: 1,
+          total_time: totalTime,
+        });
+      } else {
+        reportProgress({
+          student_id: userStore.user.id,
+          resource_id: resourceId,
+          status: 0,
+          total_time: totalTime,
+        });
+      }
     }
     scrollEl.removeEventListener("scroll", onScroll);
   }

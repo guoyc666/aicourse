@@ -226,8 +226,8 @@ def addResourseToGraph(id: str, name: str, type: str, download_url: str, content
         "id": id,
         "name": name,
         "category": "Resource",
-        "type": type,
-        "download_url": download_url
+        "download_url": download_url,
+        "type": type
     }
     final_nodes.append(resource_node)
 

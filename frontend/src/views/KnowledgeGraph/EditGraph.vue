@@ -4,7 +4,10 @@
     <el-button class="edit-btn" @click="graphStore.exitEditMode(true)"
       >保存修改并退出</el-button
     >
-    <el-button class="edit-btn" style="top: 88px" @click="graphStore.exitEditMode(false)"
+    <el-button
+      class="edit-btn"
+      style="top: 88px"
+      @click="graphStore.exitEditMode(false)"
       >不保存直接退出</el-button
     >
     <el-button class="edit-btn" style="top: 144px" @click="startEdit"
@@ -25,11 +28,7 @@
     align-center
     width="400px"
   >
-    <el-form
-      ref="editFormRef"
-      :model="editForm"
-      :rules="rules"
-    >
+    <el-form ref="editFormRef" :model="editForm" :rules="rules">
       <!-- 名称和描述 -->
       <el-form-item label="名称" prop="name">
         <el-input v-model="editForm.name" />
@@ -39,7 +38,11 @@
       </el-form-item>
       <!-- 父节点选择 -->
       <el-form-item label="父节点" v-if="!showAddChildDialog" prop="parentId">
-        <el-select v-model="editForm.parentId" placeholder="选择父节点" clearable>
+        <el-select
+          v-model="editForm.parentId"
+          placeholder="选择父节点"
+          clearable
+        >
           <el-option
             v-for="node in parentNodeList"
             :key="node.id"
@@ -50,8 +53,12 @@
       </el-form-item>
       <!-- 前置节点选择（autocomplete） -->
       <el-form-item label="前置节点">
-        <div style="display: flex; gap: 8px; width: 100%;">
-          <el-select v-model="editForm.prerequisiteID" placeholder="选择前置节点" clearable>
+        <div style="display: flex; gap: 8px; width: 100%">
+          <el-select
+            v-model="editForm.prerequisiteID"
+            placeholder="选择前置节点"
+            clearable
+          >
             <el-option
               v-for="node in preNodeList"
               :key="node.id"
@@ -75,8 +82,12 @@
       </el-form-item>
       <!-- 关联资源选择（autocomplete） -->
       <el-form-item label="关联资源">
-        <div style="display: flex; gap: 8px; width: 100%;">
-          <el-select v-model="editForm.resourceID" placeholder="选择关联资源" clearable>
+        <div style="display: flex; gap: 8px; width: 100%">
+          <el-select
+            v-model="editForm.resourceID"
+            placeholder="选择关联资源"
+            clearable
+          >
             <el-option
               v-for="node in resNodeList"
               :key="node.id"
@@ -100,7 +111,9 @@
       </el-form-item>
       <el-form-item>
         <el-button @click="handleCancelEdit">取消</el-button>
-        <el-button type="primary" @click="submitForm(editFormRef)">保存</el-button>
+        <el-button type="primary" @click="submitForm(editFormRef)"
+          >保存</el-button
+        >
       </el-form-item>
     </el-form>
   </el-dialog>
@@ -128,23 +141,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, computed, watch } from "vue";
+import { ref, nextTick, computed } from "vue";
 import cytoscape from "cytoscape";
-import type { CytoscapeElements, CytoscapeNode } from '../../types';
+import type { CytoscapeElements, CytoscapeNode } from "../../types";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { useGraphStore } from "../../stores/graphStore";
-import type { FormInstance } from 'element-plus'
+import type { FormInstance } from "element-plus";
 
-const editFormRef = ref<FormInstance>()
+const editFormRef = ref<FormInstance>();
 
 const props = defineProps<{
   elements: CytoscapeElements;
   cy: cytoscape.Core;
   expandToNode: (targetId: string) => void;
   collapseNode: (targetId: string) => void;
-  selectNode: (node: cytoscape.NodeSingular) => void;
-}>()
-const emit = defineEmits(['update:elements'])
+  selectNode: (nodeID: string) => void;
+  removeNode: (nodeID: string) => void;
+}>();
+const emit = defineEmits(["update:elements"]);
 
 // 状态管理
 const graphStore = useGraphStore();
@@ -167,7 +181,10 @@ const editForm = ref({
 const parentNodeList = ref<{ id: string; name: string }[]>([]);
 
 // 递归收集所有子节点 id
-function collectChildIds(nodeId: string, edges: CytoscapeElements["edges"]): string[] {
+function collectChildIds(
+  nodeId: string,
+  edges: CytoscapeElements["edges"]
+): string[] {
   const result: string[] = [];
   function dfs(id: string) {
     edges
@@ -181,10 +198,15 @@ function collectChildIds(nodeId: string, edges: CytoscapeElements["edges"]): str
   return result;
 }
 
-const collectAncestorIds = (nodeId: string, edges: CytoscapeElements["edges"]) => {
+const collectAncestorIds = (
+  nodeId: string,
+  edges: CytoscapeElements["edges"]
+) => {
   const result: string[] = [];
   function dfs(id: string) {
-    const parentEdge = edges.find(e => e.data.target === id && e.data.relation === "包含");
+    const parentEdge = edges.find(
+      (e) => e.data.target === id && e.data.relation === "包含"
+    );
     if (parentEdge) {
       result.push(parentEdge.data.source);
       dfs(parentEdge.data.source);
@@ -197,8 +219,8 @@ const collectAncestorIds = (nodeId: string, edges: CytoscapeElements["edges"]) =
 function updateParentNodeList(selectedId: string) {
   // 找出所有以自身为前置节点的节点 id
   const nodesWithSelfAsPrerequisite = props.elements.edges
-    .filter(e => e.data.source === selectedId && e.data.relation === "前置")
-    .map(e => e.data.target);
+    .filter((e) => e.data.source === selectedId && e.data.relation === "前置")
+    .map((e) => e.data.target);
   const childIds = collectChildIds(selectedId, props.elements.edges);
   parentNodeList.value = props.elements.nodes
     .filter(
@@ -222,8 +244,10 @@ const preNodeList = computed(() => {
 
   // 找出所有以自身为前置节点的节点 id
   const nodesWithSelfAsPrerequisite = props.elements.edges
-    .filter(e => e.data.source === selectedNodeId && e.data.relation === "前置")
-    .map(e => e.data.target);
+    .filter(
+      (e) => e.data.source === selectedNodeId && e.data.relation === "前置"
+    )
+    .map((e) => e.data.target);
 
   const excludeIds = new Set([
     selectedNodeId,
@@ -240,28 +264,18 @@ const preNodeList = computed(() => {
     }));
 });
 
-const filteredPrerequisiteNodes = ref<Record<string, string>>({});
-
-watch(
-  () => editForm.value.parentId,
-  (newParentId) => {
-    const ancestorIds = collectAncestorIds(newParentId, props.elements.edges);
-
-    const excludeIds = new Set([
-      ...ancestorIds,
-      newParentId,
-    ]);
-
-    const result: Record<string, string> = {};
-    for (const [id, name] of Object.entries(editForm.value.prerequisiteNodes)) {
-      if (!excludeIds.has(id)) {
-        result[id] = name;
-      }
+const filteredPrerequisiteNodes = computed(() => {
+  const newParentId = editForm.value.parentId;
+  const ancestorIds = collectAncestorIds(newParentId, props.elements.edges);
+  const excludeIds = new Set([...ancestorIds, newParentId]);
+  const result: Record<string, string> = {};
+  for (const [id, name] of Object.entries(editForm.value.prerequisiteNodes)) {
+    if (!excludeIds.has(id)) {
+      result[id] = name;
     }
-    filteredPrerequisiteNodes.value = result;
-  },
-  { immediate: true }
-);
+  }
+  return result;
+});
 
 const resNodeList = computed(() => {
   return graphStore.resources.map((r) => ({
@@ -287,7 +301,7 @@ function addChildNode() {
   addChildDescription.value = "";
   showAddChildDialog.value = true;
 }
-function startEditChildNode() {
+async function startEditChildNode() {
   if (!graphStore.selectedNodeID) {
     ElMessage.error("未选中父节点，无法添加子节点");
     return;
@@ -298,7 +312,7 @@ function startEditChildNode() {
   }
   // 添加新节点
   const parentId = graphStore.selectedNodeID;
-  const parentNode = props.cy.getElementById(parentId);
+  const parentNode = props.elements.nodes.find((n) => n.data.id === parentId);
   const newNodeId = `node_${Date.now()}`;
   const newNodeData: CytoscapeNode = {
     data: {
@@ -306,7 +320,7 @@ function startEditChildNode() {
       name: addChildName.value,
       description: addChildDescription.value,
       category: "Concept",
-      depth: parentNode.data("depth") + 1,
+      depth: parentNode!.data.depth + 1,
       expanded: true,
       img: "",
     },
@@ -319,15 +333,16 @@ function startEditChildNode() {
     relation: "包含",
   };
   props.elements.edges.push({ data: newEdgeData });
-  
+
   props.collapseNode(parentId);
   props.expandToNode(parentId);
+
   // 关闭添加子节点弹窗
   showAddChildDialog.value = false;
-  emit('update:elements', props.elements);
+  emit("update:elements", props.elements);
 
   ElMessage.success("创建成功！请编辑新节点信息");
-  props.selectNode(props.cy.getElementById(newNodeId));
+  props.selectNode(newNodeId);
 
   // 打开编辑弹窗
   startEdit();
@@ -351,12 +366,14 @@ function startEdit() {
     ElMessage.warning("请先选中节点");
     return;
   }
-  const selectedNode = props.cy.getElementById(graphStore.selectedNodeID!);
+  const selectedNode = props.elements.nodes.find(
+    (n) => n.data.id === graphStore.selectedNodeID
+  );
   if (!selectedNode) {
     ElMessage.warning("请先选中节点");
     return;
   }
-  if (selectedNode.data("category") === "Course") {
+  if (selectedNode.data.category === "Course") {
     ElMessage.warning("课程节点不可编辑");
     return;
   }
@@ -364,18 +381,20 @@ function startEdit() {
   clearEditForm();
 
   // 名称和描述
-  editForm.value.name = selectedNode.data("name");
-  editForm.value.description = selectedNode.data("description");
+  editForm.value.name = selectedNode.data.name;
+  editForm.value.description = selectedNode.data.description || "";
 
   // 父节点
-  updateParentNodeList(selectedNode.id());
-  editForm.value.parentId = props.elements.edges.find(
-    (l) => l.data.target === selectedNode.id() && l.data.relation === "包含"
-  )?.data.source || "";
+  updateParentNodeList(selectedNode.data.id);
+  editForm.value.parentId =
+    props.elements.edges.find(
+      (l) =>
+        l.data.target === selectedNode.data.id && l.data.relation === "包含"
+    )?.data.source || "";
 
   // 前置节点
   const preLinks = props.elements.edges.filter(
-    (l) => l.data.target === selectedNode.id() && l.data.relation === "前置"
+    (l) => l.data.target === selectedNode.data.id && l.data.relation === "前置"
   );
   preLinks.forEach((l) => {
     const preNode = props.elements.nodes.find(
@@ -388,12 +407,10 @@ function startEdit() {
 
   // 关联资源
   const resLinks = props.elements.edges.filter(
-    (l) => l.data.source === selectedNode.id() && l.data.relation === "关联"
+    (l) => l.data.source === selectedNode.data.id && l.data.relation === "关联"
   );
   resLinks.forEach((l) => {
-    const resNode = graphStore.resources.find(
-      (r) => r.id === l.data.target
-    );
+    const resNode = graphStore.resources.find((r) => r.id === l.data.target);
     if (resNode) {
       editForm.value.resourceNodes[resNode.id] = resNode.name;
     }
@@ -405,7 +422,9 @@ function startEdit() {
 // 处理前置节点选择
 function handlePrerequisiteSelect() {
   if (!editForm.value.prerequisiteID) return;
-  const node = preNodeList.value.find(n => n.id === editForm.value.prerequisiteID);
+  const node = preNodeList.value.find(
+    (n) => n.id === editForm.value.prerequisiteID
+  );
   if (node && !editForm.value.prerequisiteNodes[node.id]) {
     editForm.value.prerequisiteNodes[node.id] = node.name;
   }
@@ -415,11 +434,12 @@ function removePrerequisiteNode(id: string) {
   delete editForm.value.prerequisiteNodes[id];
 }
 
-
 // 处理关联资源选择
 function handleResourceSelect() {
   if (!editForm.value.resourceID) return;
-  const node = resNodeList.value.find(n => n.id === editForm.value.resourceID);
+  const node = resNodeList.value.find(
+    (n) => n.id === editForm.value.resourceID
+  );
   if (node && !editForm.value.resourceNodes[node.id]) {
     editForm.value.resourceNodes[node.id] = node.name;
   }
@@ -428,8 +448,6 @@ function handleResourceSelect() {
 function removeResourceNode(id: string) {
   delete editForm.value.resourceNodes[id];
 }
-
-
 
 async function submitForm(formEl: FormInstance | undefined) {
   if (!formEl) return;
@@ -446,16 +464,16 @@ async function submitForm(formEl: FormInstance | undefined) {
 // 递归更新 depth
 function updateDepths(nodeId: string, parentDepth: number) {
   // 当前节点
-  const node = props.elements.nodes.find(n => n.data.id === nodeId);
+  const node = props.elements.nodes.find((n) => n.data.id === nodeId);
   if (node) {
     node.data.depth = parentDepth + 1;
-    props.cy.getElementById(nodeId).data('depth', parentDepth + 1);
+    props.cy.getElementById(nodeId).data("depth", parentDepth + 1);
   }
 
   // 所有子节点
   props.elements.edges
-    .filter(e => e.data.source === nodeId && e.data.relation === "包含")
-    .forEach(e => {
+    .filter((e) => e.data.source === nodeId && e.data.relation === "包含")
+    .forEach((e) => {
       updateDepths(e.data.target, parentDepth + 1);
     });
 }
@@ -473,7 +491,9 @@ async function saveNodeEdits() {
   const nodeId = selectedNode.id();
 
   // 更新 depth 字段
-  const parentNode = props.elements.nodes.find(n => n.data.id === editForm.value.parentId);
+  const parentNode = props.elements.nodes.find(
+    (n) => n.data.id === editForm.value.parentId
+  );
   if (!parentNode) {
     ElMessage.error("父节点不存在，无法修改");
     return;
@@ -494,13 +514,12 @@ async function saveNodeEdits() {
   props.expandToNode(editForm.value.parentId);
   // 先移除原有父节点的“包含”边
   props.elements.edges = props.elements.edges.filter(
-    (l) =>
-      !(
-        l.data.target === nodeId &&
-        l.data.relation === "包含"
-      )
+    (l) => !(l.data.target === nodeId && l.data.relation === "包含")
   );
-  props.cy.edges().filter(e => e.data('target') === nodeId && e.data('relation') === '包含').remove();
+  props.cy
+    .edges()
+    .filter((e) => e.data("target") === nodeId && e.data("relation") === "包含")
+    .remove();
 
   // 添加新的父节点边
   const parentEdgeData = {
@@ -509,20 +528,17 @@ async function saveNodeEdits() {
     relation: "包含",
   };
   props.elements.edges.push({ data: parentEdgeData });
-  props.cy.add({ group: 'edges', data: parentEdgeData });
+  props.cy.add({ group: "edges", data: parentEdgeData });
 
   // 前置节点关系（全部替换为当前表单中的前置节点，“前置”关系）
   // 先移除原有的前置边
   props.elements.edges = props.elements.edges.filter(
-    (l) =>
-      !(
-        l.data.target === nodeId &&
-        l.data.relation === "前置"
-      )
+    (l) => !(l.data.target === nodeId && l.data.relation === "前置")
   );
-  props.cy.edges().filter(
-    e =>e.data('target') === nodeId && e.data('relation') === '前置'
-  ).remove();
+  props.cy
+    .edges()
+    .filter((e) => e.data("target") === nodeId && e.data("relation") === "前置")
+    .remove();
   // 添加新的前置边
   for (const preId of Object.keys(filteredPrerequisiteNodes.value)) {
     const preEdgeData = {
@@ -531,17 +547,14 @@ async function saveNodeEdits() {
       relation: "前置",
     };
     props.elements.edges.push({ data: preEdgeData });
-    if (props.cy.getElementById(preId).length) props.cy.add({ group: 'edges', data: preEdgeData });
+    if (props.cy.getElementById(preId).length)
+      props.cy.add({ group: "edges", data: preEdgeData });
   }
 
   // 关联资源关系（全部替换为当前表单中的资源，“关联”关系）
   // 先移除原有的关联边
   props.elements.edges = props.elements.edges.filter(
-    (l) =>
-      !(
-        l.data.source === nodeId &&
-        l.data.relation === "关联"
-      )
+    (l) => !(l.data.source === nodeId && l.data.relation === "关联")
   );
   // 添加新的关联边
   for (const resId of Object.keys(editForm.value.resourceNodes)) {
@@ -552,18 +565,18 @@ async function saveNodeEdits() {
         relation: "关联",
       },
     });
-  };
+  }
 
   // 清空表单并关闭弹窗
   clearEditForm();
   showEditDialog.value = false;
-  emit('update:elements', props.elements);
+  emit("update:elements", props.elements);
 
   ElMessage.success("修改成功");
   await nextTick();
-  props.selectNode(selectedNode);
+  props.selectNode(graphStore.selectedNodeID!);
   await nextTick();
-};
+}
 
 function deleteNode() {
   if (!graphStore.selectedNodeID) {
@@ -583,7 +596,11 @@ function deleteNode() {
       const nodeId = graphStore.selectedNodeID!;
       const childIds = collectChildIds(nodeId, props.elements.edges);
       const idsToDelete = [nodeId, ...childIds];
-      // 从元素中删除节点和相关边 
+      // 在 cytoscape 实例中删除节点和相关边
+      idsToDelete.forEach((id) => {
+        props.removeNode(id);
+      });
+      // 从元素中删除节点和相关边
       props.elements.nodes = props.elements.nodes.filter(
         (n) => !idsToDelete.includes(n.data.id)
       );
@@ -592,17 +609,7 @@ function deleteNode() {
           !idsToDelete.includes(e.data.source) &&
           !idsToDelete.includes(e.data.target)
       );
-
-      // 取消选中状态
-      graphStore.unSelectNode();
-      // 在 cytoscape 实例中删除节点和相关边
-      idsToDelete.forEach((id) => {
-        const cyNode = props.cy.getElementById(id);
-        if (cyNode.length) {
-          props.cy.remove(cyNode);
-        }
-      });
-      emit('update:elements', props.elements);
+      emit("update:elements", props.elements);
 
       ElMessage.success("删除成功");
     })

@@ -105,16 +105,8 @@
                   <el-tag :type="getNodeTypeTag(node.node_type)" size="small">
                     {{ getNodeTypeName(node.node_type) }}
                   </el-tag>
-                  <el-tag size="small" type="info">等级: {{ node.level }}</el-tag>
                   <span class="question-count">{{ getQuestionCount(node.id) }}题</span>
                 </div>
-              </div>
-              <div class="master-progress">
-                <div class="progress-label">掌握度: {{ getNodeProgress(node.id) }}%</div>
-                <el-progress 
-                  :percentage="getNodeProgress(node.id)"
-                  :color="getProgressColor(getNodeProgress(node.id))"
-                />
               </div>
             </div>
           </div>
@@ -385,17 +377,8 @@
                 <el-tag :type="getNodeTypeTag(node.node_type)" size="small">
                   {{ getNodeTypeName(node.node_type) }}
                 </el-tag>
-                <el-tag size="small" type="info">等级: {{ node.level }}</el-tag>
                 <span class="question-count">{{ getQuestionCount(node.id) }}题</span>
               </div>
-            </div>
-            <div class="knowledge-progress">
-              <div class="progress-label">掌握度: {{ getNodeProgress(node.id) }}%</div>
-              <el-progress
-                :percentage="getNodeProgress(node.id)"
-                :color="getProgressColor(getNodeProgress(node.id))"
-                size="small"
-              />
             </div>
           </div>
         </el-scrollbar>
@@ -539,6 +522,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { EditPen, Document, Check, CircleCheck, TrendCharts, Collection, Refresh, Calendar, Timer, Warning } from '@element-plus/icons-vue'
 import { getPracticeQuestions, submitQuestionAnswer, getLearningStats, getKnowledgeNodes, getPracticeHistory, getPracticeDetail, getKnowledgeMastery } from '@/api/questions'
+import { graphAPI } from '../../api'
 
 // 响应式数据
 const showPracticeDialog = ref(false)
@@ -661,33 +645,11 @@ const getNodeTypeTag = (type) => {
 // 获取题目数量
 const getQuestionCount = (nodeId) => {
   if (!nodeId) return 0
-  const node = knowledgeNodes.value.find(item => item.id === nodeId)
-  if (!node) return 0
-  if (typeof node.question_count === 'number') {
+  const node = knowledgeNodes.value.find(n => n.id === nodeId)
+  if (node && node.question_count !== undefined) {
     return node.question_count
   }
-  if (typeof node.questionCount === 'number') {
-    return node.questionCount
-  }
-  if (node.statistics && typeof node.statistics.question_count === 'number') {
-    return node.statistics.question_count
-  }
   return 0
-}
-
-// 获取节点进度
-const getNodeProgress = (nodeId) => {
-  // 从掌握度数据中获取，如果没有则使用默认值
-  const progress = knowledgeMastery.value[nodeId]?.progress || 0
-  // 确保返回值在0-100之间
-  return Math.round(Math.min(Math.max(progress, 0), 100))
-}
-
-// 获取进度颜色
-const getProgressColor = (percentage) => {
-  if (percentage >= 80) return '#67c23a'
-  if (percentage >= 60) return '#e6a23c'
-  return '#f56c6c'
 }
 
 // 获取难度标签
@@ -881,25 +843,9 @@ const getCodeErrorMessage = (errorCode) => {
 const loadKnowledgeNodes = async () => {
   loading.knowledge = true
   try {
-    const response = await getKnowledgeNodes()
-    if (response?.code === 200 && Array.isArray(response.data)) {
-      knowledgeNodes.value = response.data
-    } else if (response?.data?.code === 200 && Array.isArray(response.data.data)) {
-      knowledgeNodes.value = response.data.data
-    } else {
-      knowledgeNodes.value = []
-    }
-    
-    // 加载每个知识点的掌握度
-    for (const node of knowledgeNodes.value) {
-      try {
-        const masteryResponse = await getKnowledgeMastery(node.id)
-        knowledgeMastery.value[node.id] = masteryResponse.data.data
-      } catch (error) {
-        // 如果获取失败，使用默认值
-        knowledgeMastery.value[node.id] = { progress: 0 }
-      }
-    }
+    const data = await graphAPI.fetchAllKnowledgeNodes()
+    console.log('获取知识点列表响应:', data)
+    knowledgeNodes.value = data
   } catch (error) {
     ElMessage.error('加载知识点失败')
     knowledgeNodes.value = []

@@ -1116,6 +1116,10 @@ async def submit_answers(
         
         # 提交事务
         db.commit()
+
+        from crud.mastery import calc_mastery
+        # 计算并更新掌握度
+        calc_mastery(current_user.id, db)
         
         return JSONResponse(
             content={
