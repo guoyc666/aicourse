@@ -5,9 +5,16 @@ WORKDIR /app
 # 设置无缓冲输出，便于日志
 ENV PYTHONUNBUFFERED=1
 
+ENV PYTHONDONTWRITEBYTECODE=1
+# 安装系统依赖（libmagic、图像依赖和编译工具）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential gcc libpq-dev default-libmysqlclient-dev libssl-dev libffi-dev \
+    libmagic-dev libjpeg-dev zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # 复制并安装依赖（使用项目 backend 目录下的 requirements.txt）
 COPY ./requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r ./requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN pip install --no-cache-dir -r ./requirements.txt
 
 # 复制 backend 目录下的所有代码到容器工作目录
 COPY . /app

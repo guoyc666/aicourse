@@ -1,0 +1,21 @@
+# 排除 node_modules 目录
+node_modules/
+
+# 排除构建缓存
+/dist/
+/.build/
+
+# 排除本地开发环境配置文件
+*.env
+*.local
+
+# 排除日志文件
+*.log
+
+# 排除 Git 版本控制文件
+.git/
+.gitignore
+
+# 排除 IDE 配置文件
+.vscode/
+.idea/

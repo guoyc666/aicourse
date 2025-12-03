@@ -49,8 +49,7 @@ xf_client = OpenAI(api_key=os.getenv("XF_API_KEY"), base_url=os.getenv("XF_BASE_
 
 
 def get_embedding(
-    text: str | list[str], dimensions=768,
-    model=os.getenv("EMBEDDING_ID")
+    text: str | list[str], dimensions=768, model=os.getenv("EMBEDDING_ID")
 ) -> list[Embedding]:
     """
     调用 Embedding API。
@@ -148,15 +147,19 @@ def get_image_ocr(image_path: str, model=os.getenv("OCR_ID")) -> str:
 
 
 def get_audio_text(audio_path: str, model=os.getenv("ASR_MODEL")) -> str:
-    url = os.getenv("ASR_URL")
+    try:
+        response = requests.post(
+            url=os.getenv("ASR_URL"),
+            data={"model": model},
+            files={"file": open(audio_path, "rb")},
+            headers={"Authorization": "Bearer " + os.getenv("ASR_KEY")},
+        )
 
-    files = { "file": open(audio_path, 'rb') }
-    payload = { "model": model }
-    headers = {"Authorization": f"Bearer {os.getenv("ASR_KEY")}"}
+        return response.json()["text"]
+    except Exception as e:
+        print(f"ASR 请求出错: {e}")
+        return ""
 
-    response = requests.post(url, data=payload, files=files, headers=headers)
-
-    return response.json()['text']
 
 if __name__ == "__main__":
     ...

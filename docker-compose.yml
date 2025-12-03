@@ -1,32 +1,33 @@
 services:
   backend:
     build: ./backend
-    container_name: ai_backend
+    container_name: aicourse-backend
     ports:
       - "8000:8000"
     depends_on:
       - mysql
       - neo4j
     environment:
-      - DATABASE_URL=mysql://root:root@mysql:3306/aicourse
-      - NEO4J_URL=bolt://neo4j:7687
+      - DATABASE_URL=mysql+pymysql://root:root@mysql:3306/aicourse
+      - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USER=neo4j
       - NEO4J_PASS=aicourse
     volumes:
-      - ./data/uploads:/app/data/uploads
-      - ./data/chroma:/app/data/chroma
+      - ./data/uploads:/data/uploads
+      - ./data/chroma:/data/chroma
+      - ./hf_models:/data/hf_models
 
   frontend:
     build: ./frontend
-    container_name: ai_frontend
+    container_name: aicourse-frontend
     ports:
-      - "3000:3000"
+      - ":80:80"
     depends_on:
       - backend
 
   mysql:
     image: mysql:8.0
-    container_name: ai_mysql
+    container_name: aicourse-mysql
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root
@@ -38,7 +39,7 @@ services:
 
   neo4j:
     image: neo4j:5.13
-    container_name: ai_neo4j
+    container_name: aicourse-neo4j
     restart: always
     environment:
       NEO4J_AUTH: "neo4j/aicourse"

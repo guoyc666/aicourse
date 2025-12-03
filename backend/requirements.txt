@@ -20,7 +20,7 @@ neo4j
 py2neo
 
 # 文件处理
-python-magic-bin==0.4.14  # 文件类型检测
+python-magic
 pymupdf
 python-pptx
 python-docx

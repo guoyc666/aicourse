@@ -592,6 +592,9 @@ function deleteNode() {
           !idsToDelete.includes(e.data.source) &&
           !idsToDelete.includes(e.data.target)
       );
+
+      // 取消选中状态
+      graphStore.unSelectNode();
       // 在 cytoscape 实例中删除节点和相关边
       idsToDelete.forEach((id) => {
         const cyNode = props.cy.getElementById(id);
@@ -599,9 +602,6 @@ function deleteNode() {
           props.cy.remove(cyNode);
         }
       });
-
-      // 取消选中状态
-      graphStore.unSelectNode();
       emit('update:elements', props.elements);
 
       ElMessage.success("删除成功");

@@ -61,7 +61,7 @@ request.interceptors.response.use(
           return Promise.reject(error)
         case 404:
           ElMessage.error('请求的资源不存在')
-          return Promise.resolve({ error: 'not_found', message: '请求的资源不存在' })
+          return Promise.reject(error)
         case 500:
           ElMessage.error('服务器内部错误')
           break

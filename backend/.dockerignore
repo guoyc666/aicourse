@@ -1,0 +1,22 @@
+# 排除 Python 虚拟环境
+venv/
+.venv/
+__pycache__/
+
+# 排除临时文件和日志
+*.log
+*.tmp
+logs/
+
+# 排除测试文件和目录
+tests/
+
+# 排除 IDE 配置文件
+.vscode/
+.idea/
+
+# 排除 Git 版本控制文件
+.git/
+.gitignore
+
+*.example

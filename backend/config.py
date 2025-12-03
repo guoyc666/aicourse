@@ -10,8 +10,8 @@ PROJECT_ROOT = Path(__file__).parent.resolve()
 # ------------------------------
 class StorageConfig:
     # 文件保存根目录（支持绝对路径和相对路径）
-    UPLOAD_DIR: Path = PROJECT_ROOT / "uploads"
-    
+    UPLOAD_DIR: Path =  Path("../data/uploads")
+
     # 是否按日期创建子目录（如: uploads/2023/10/12/）
     USE_DATE_SUBDIR: bool = True
     
@@ -19,8 +19,8 @@ class StorageConfig:
     DATE_DIR_FORMAT: str = "%Y/%m/%d"
     
     # 临时文件目录（用于分片上传等场景）
-    TEMP_DIR: Path = PROJECT_ROOT / "temp_uploads"
-    
+    TEMP_DIR: Path = Path("../data/temp_uploads")
+
     # 是否保留原始文件名（false则使用UUID生成唯一文件名）
     PRESERVE_ORIGINAL_FILENAME: bool = False
     

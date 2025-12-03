@@ -3,7 +3,6 @@ import os
 import fitz
 from docx import Document
 from pptx import Presentation
-import whisper
 from .parse_image import understand_image
 from .chroma_manager import VectorStore
 from .graph_utils import addResourseToGraph
@@ -13,12 +12,12 @@ def analyse_file(filename, filepath, fileid, download_url, file_type, is_sync=Fa
     """解析文件并存入向量数据库"""
     try:
         text = extract_text(filepath, file_type)
-        print(text[:100])
         if is_sync:
             addResourseToGraph(
                 id=fileid,
                 name=filename,
                 type=file_type,
+                download_url=download_url,
                 content=text
             )
         chunks = chunk_text(text)
@@ -99,6 +98,7 @@ def extract_text_audio_vedio(path: str) -> str:
     """
     from .ai_client import get_audio_text
     return get_audio_text(path)
+    import whisper
     model = whisper.load_model("small")
     result = model.transcribe(path)
     return result.get("text", "").strip()
