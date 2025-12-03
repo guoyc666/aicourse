@@ -13,9 +13,9 @@ venv/
 *.env
 
 # Docker
-data/
+data/*
 uploads/
-hfd_models/*
+hf_models/
 
 # ide
 .vscode/

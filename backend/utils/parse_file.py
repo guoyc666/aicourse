@@ -83,12 +83,14 @@ def extract_text_image(path: str) -> str:
     return understand_image(path, "请总结图片内容")
 
 
-def extract_text_audio_vedio(path: str, model_size="small") -> str:
+def extract_text_audio_vedio(path: str) -> str:
     """
     使用 Whisper 转录音频为文本
     model_size 可选：tiny / base / small / medium / large
     """
-    model = whisper.load_model(model_size)
+    from .ai_client import get_audio_text
+    return get_audio_text(path)
+    model = whisper.load_model("small")
     result = model.transcribe(path)
     return result.get("text", "").strip()
 

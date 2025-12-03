@@ -4,10 +4,10 @@ import httpx
 from openai import OpenAI
 from openai.types.embedding import Embedding
 import os
+import requests
 
 client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"), 
-    base_url=os.getenv("OPENAI_BASE_URL")
+    api_key=os.getenv("OPENAI_API_KEY"), base_url=os.getenv("OPENAI_BASE_URL")
 )
 
 
@@ -49,7 +49,8 @@ xf_client = OpenAI(api_key=os.getenv("XF_API_KEY"), base_url=os.getenv("XF_BASE_
 
 
 def get_embedding(
-    text: str | list[str], model=os.getenv("EMBEDDING_ID")
+    text: str | list[str], dimensions=768,
+    model=os.getenv("EMBEDDING_ID")
 ) -> list[Embedding]:
     """
     调用 Embedding API。
@@ -61,7 +62,7 @@ def get_embedding(
         response = xf_client.embeddings.create(
             model=model,
             input=text,
-            # dimensions=768,
+            dimensions=dimensions,
         )
         return response.data
     except Exception as e:
@@ -96,6 +97,21 @@ def get_rerank(query, documents, model=os.getenv("RERANKER_ID")) -> dict:
         return None
 
 
+def _get_embedding(text: str | list[str]):
+    from utils.model_utils import EmbeddingManager
+
+    embedding_manager = EmbeddingManager()
+    return embedding_manager.encode(text)
+
+
+def _get_rerank(query, documents):
+    from utils.model_utils import RerankerManager
+
+    reranker_manager = RerankerManager()
+    ranked_results = reranker_manager.rank(query, documents)
+    return ranked_results
+
+
 def get_image_ocr(image_path: str, model=os.getenv("OCR_ID")) -> str:
     """
     调用 OCR API 进行图片文字识别。
@@ -118,7 +134,6 @@ def get_image_ocr(image_path: str, model=os.getenv("OCR_ID")) -> str:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "提取图片内容"},
                         {"type": "image_url", "image_url": {"url": data_url}},
                     ],
                 }
@@ -126,12 +141,22 @@ def get_image_ocr(image_path: str, model=os.getenv("OCR_ID")) -> str:
             temperature=0.7,
             max_tokens=8192,
         )
-        result = response.json()
-        return result.get("text", "")
+        return response.choices[0].message.content
     except Exception as e:
         print(f"OCR 请求出错: {e}")
         return ""
 
+
+def get_audio_text(audio_path: str, model=os.getenv("ASR_MODEL")) -> str:
+    url = os.getenv("ASR_URL")
+
+    files = { "file": open(audio_path, 'rb') }
+    payload = { "model": model }
+    headers = {"Authorization": f"Bearer {os.getenv("ASR_KEY")}"}
+
+    response = requests.post(url, data=payload, files=files, headers=headers)
+
+    return response.json()['text']
 
 if __name__ == "__main__":
     ...

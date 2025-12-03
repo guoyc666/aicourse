@@ -65,8 +65,17 @@ def split_text(text, max_len=400):
     return parts
 
 if __name__ == "__main__":
-    input_dir = Path("train_raw")
-    output_dir = Path("train_data")
+    import argparse
+
+    parser = argparse.ArgumentParser(description="从输入目录生成 QA jsonl 并合并到输出目录")
+    parser.add_argument("--raw-dir", "-r", dest="input_dir", default="train_raw", help="原始输入目录（默认: train_raw）")
+    parser.add_argument("--out-dir", "-o", dest="output_dir", default="train_data", help="输出目录（默认: train_data）")
+    args = parser.parse_args()
+
+    input_dir = Path(args.input_dir)
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     for file_path in input_dir.iterdir():
         generate_qa(file_path, output_dir)
         
@@ -83,4 +92,4 @@ if __name__ == "__main__":
                         continue
                     seen.add(line)
                     wf.write(line + "\n")
-    print(f"合并完成：{merged}")
+    print(f"生成完毕：{merged}")

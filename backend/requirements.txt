@@ -25,7 +25,7 @@ pymupdf
 python-pptx
 python-docx
 pillow
-openai-whisper
+# openai-whisper
 
 # ai
 openai
