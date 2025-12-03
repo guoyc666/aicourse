@@ -15,6 +15,25 @@ from auth import (
 
 router = APIRouter()
 
+@router.get("/students/", response_model=List[dict])
+async def get_all_students(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    获取所有学生列表，返回{id, name}
+    需要有user:read权限
+    """
+    #verify_permission(db, current_user.id, "user:read")
+    # 查询学生角色id
+    student_role = db.query(Role).filter(Role.name == "student").first()
+    if not student_role:
+        raise HTTPException(status_code=404, detail="学生角色不存在")
+    # 查询所有拥有学生角色的用户
+    student_ids = db.query(UserRole.user_id).filter(UserRole.role_id == student_role.id).subquery()
+    students = db.query(User).filter(User.id.in_(student_ids)).all()
+    return [{"id": stu.id, "name": stu.full_name} for stu in students]
+
 @router.get("/", response_model=List[UserResponse])
 async def get_users(
     skip: int = 0,
@@ -24,7 +43,7 @@ async def get_users(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """获取用户列表（需要管理员权限）"""
+    # 检查权限
     verify_permission(db, current_user.id, "user:read")
     
     # 基础查询

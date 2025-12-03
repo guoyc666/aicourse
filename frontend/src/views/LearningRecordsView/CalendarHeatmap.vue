@@ -1,21 +1,21 @@
 <template>
   <div class="echarts-graph">
     <div class="selector">
-      <el-checkbox v-model="isTeacher" style="margin-right: 16px;">
-        教师身份
-      </el-checkbox>
       <el-select v-model="calendarYear" style="width: 120px;">
         <el-option v-for="y in years" :key="y" :label="y" :value="String(y)" />
       </el-select>
       <el-select
-        v-if="isTeacher"
+        v-if="!isStudent"
         v-model="selectedStudent"
         style="width: 120px; margin-left: 16px;"
         placeholder="选择学生"
       >
-        <el-option :value="1" label="张三 (1)" />
-        <el-option :value="2" label="李四 (2)" />
-        <el-option :value="3" label="王五 (3)" />
+        <el-option
+          v-for="student in students"
+          :key="student.id"
+          :value="student.id"
+          :label="student.name"
+        />
       </el-select>
     </div>
     <div ref="chartRef" style="width:100%;height:100%;"></div>
@@ -34,6 +34,13 @@ import {
 import { HeatmapChart } from 'echarts/charts';
 import { CanvasRenderer } from 'echarts/renderers';
 import { useAnalysisStore } from "../../stores/analysisStore";
+import { getStudents } from "../../api/users";
+import { useUserStore } from "../../stores/user";
+
+const userStore = useUserStore();
+const isStudent = userStore.hasRole("student");
+const students = ref<{ id: number; name: string }[]>([]);
+const selectedStudent = ref<number>(1);
 
 const chartRef = ref<HTMLDivElement | null>(null);
 let myChart: echarts.ECharts | null = null;
@@ -53,10 +60,6 @@ const years = Array.from({ length: 5 }, (_, i) => currentYear - i); // 最近5�
 const calendarYear = ref(currentYear);
 
 const analysisStore = useAnalysisStore();
-
-// 新增：教师身份和学生选择
-const isTeacher = ref(false);
-const selectedStudent = ref(1);
 
 const option = {
   title: {
@@ -104,7 +107,20 @@ const option = {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  if (isStudent) {
+    selectedStudent.value = userStore.user.id;
+  } else {
+    const res = await getStudents();
+    //console.log('获取学生列表:', res);
+    students.value = res;
+    // 默认选第一个学生
+    if (students.value.length > 0) {
+      selectedStudent.value = students.value[0]!.id;
+    }
+  }
+
+  await analysisStore.fetchCalendarDurations(calendarYear.value, selectedStudent.value);
   if (!chartRef.value) return;
   myChart = echarts.init(chartRef.value);
   myChart.setOption(option);
@@ -116,13 +132,6 @@ onMounted(() => {
     option.series.data = analysisStore.calendarDurationRecords;
     if (myChart) myChart.setOption(option, true);
   }, { immediate: true });
-
-  // 监听教师身份变化，切换学生时自动刷新
-  watch(isTeacher, (val) => {
-    if (!val) {
-      selectedStudent.value = 1; // 非教师时默认学生1
-    }
-  });
 
   // 监听日历格子点击事件
   myChart.on('click', function (params: any) {

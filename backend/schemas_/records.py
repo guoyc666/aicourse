@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
 class LearningRecordCreate(BaseModel):
@@ -7,8 +7,22 @@ class LearningRecordCreate(BaseModel):
     resource_id: str
     status: int
     total_time: int
-    page_times: List[int]
-    timestamp: datetime
+    page_times: Optional[List[int]] = None
 
 class LearningRecord(LearningRecordCreate):
     id: int
+    timestamp: datetime
+
+class StudyTimeOut(BaseModel):
+    study_time: float
+    knowledge_id: str
+
+class AverageStudyTimeOut(BaseModel):
+    knowledge_id: str
+    average_study_time: float
+
+class StudyTimeListOut(BaseModel):
+    knowledge_id: str
+    study_time: float
+    student_id: int
+    student_name: str

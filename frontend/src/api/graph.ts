@@ -1,4 +1,4 @@
-import type { KnowledgeLink, KnowledgeNode } from "../types";
+import type { KnowledgeEdge, KnowledgeNode } from "../types";
 import api from "./request";
 
 const mockNodeData: KnowledgeNode[] = [
@@ -17,7 +17,7 @@ const mockNodeData: KnowledgeNode[] = [
   { id: "child3", category: "Concept", depth: 5, name: "子节点3" },
 ];
 
-const mockLinks: KnowledgeLink[] = [
+const mockEdges: KnowledgeEdge[] = [
   { source: "IntroductionToAI", target: "MachineLearning", relation: "包含" },
   { source: "IntroductionToAI", target: "DeepLearning", relation: "包含" },
   { source: "DeepLearning", target: "NeuralNetwork", relation: "包含" },
@@ -30,30 +30,34 @@ const mockLinks: KnowledgeLink[] = [
 export const graphAPI = {
   // 获取知识图谱数据
   async fetchKnowledgeGraph() {
-    const res = await api.get("/graph");
-    return res.data;
+    const res = await api.get("/api/graph");
+    return res;
   },
   // 获取模拟知识图谱数据
   async fetchMockKnowledgeGraph() {
     return {
       nodes: mockNodeData,
-      links: mockLinks,
+      edges: mockEdges,
     };
   },
   // 获取节点详情
   async fetchNodeDetail(nodeId: string) {
-    const studentId = 1; // 临时使用固定学生ID，后续可改为动态传入
-    const res = await api.get(`/node/detail/${nodeId}/${studentId}`);
-    return res.data;
+    const res = await api.get(`/api/node/detail/${nodeId}`);
+    return res;
   },
   // 提交知识图谱数据
-  async updateKnowledgeGraph(nodes: any[], links: any[]) {
-    const res = await api.put("/graph", { nodes, links });
-    return res.data;
+  async updateKnowledgeGraph(nodes: any[], edges: any[]) {
+    const res = await api.put("/api/graph", { nodes: nodes, edges: edges });
+    return res;
   },
   // 创建节点
   async createNode(node: KnowledgeNode) {
-    const res = await api.post("/node", node);
-    return res.data;
+    const res = await api.post("/api/node", node);
+    return res;
+  },
+  // 获取所有知识点
+  async fetchAllKnowledgeNodes() {
+    const res = await api.get("/api/node/knowledge/all");
+    return res;
   },
 };

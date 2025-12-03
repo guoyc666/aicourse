@@ -66,14 +66,9 @@ class FileLimitConfig:
 # API相关配置
 # ------------------------------
 class ApiConfig:
-    # 基础路径
-    BASE_PATH: str = "/api"
-    
-    # 上传接口完整路径
-    UPLOAD_ENDPOINT: str = f"{BASE_PATH}/resource/upload"
     
     # 下载文件的URL前缀
-    DOWNLOAD_URL_PREFIX: str = f"{BASE_PATH}/resources"
+    DOWNLOAD_URL_PREFIX: str = "/api/resources"
     
     # 分页默认配置
     DEFAULT_PAGE: int = 1

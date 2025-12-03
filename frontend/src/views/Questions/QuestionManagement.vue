@@ -274,7 +274,8 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { addQuestion, deleteQuestion, getQuestionList, getKnowledgeNodes } from '@/api/questions'
+import { addQuestion, deleteQuestion, getQuestionList } from '@/api/questions'
+import { graphAPI } from '../../api'
 
 // 状态管理
 const loading = ref(false)
@@ -372,32 +373,9 @@ const loadQuestions = async () => {
 // 加载知识点列表
 const loadKnowledgeNodes = async () => {
   try {
-    const data = await getKnowledgeNodes()
+    const data = await graphAPI.fetchAllKnowledgeNodes()
     console.log('获取知识点列表响应:', data)
-    if (data.code === 200) {
-      // 数据验证和清理，确保每个知识点都有有效的ID和名称
-      const validNodes = (data.data || []).filter(node => {
-        // 过滤掉无效的节点（ID为空、undefined、null或0）
-        const isValid = node && 
-                       node.id !== null && 
-                       node.id !== undefined && 
-                       node.id !== '' && 
-                       node.id !== 0 &&
-                       node.name &&
-                       typeof node.name === 'string'
-        return isValid
-      }).map(node => ({
-        id: String(node.id), // 确保ID是字符串类型
-        name: node.name || String(node.id), // 如果name为空，使用id作为name
-        description: node.description || '',
-        node_type: node.node_type || 'concept',
-        level: node.level || 1,
-        question_count: node.question_count || 0
-      }))
-      
-      console.log('过滤后的知识点列表:', validNodes)
-      knowledgeNodes.value = validNodes
-    }
+    knowledgeNodes.value = data
   } catch (error) {
     console.error('获取知识点列表失败:', error)
     // 如果获取失败，设置默认的空数组

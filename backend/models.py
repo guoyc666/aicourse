@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Enum, Float
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
+import enum
 
 class User(Base):
     __tablename__ = "users"
@@ -167,10 +168,6 @@ class FileResource(Base):
     # 关联关系
     uploader = relationship("User")
 
-# 导入enum支持题目类型枚举
-from sqlalchemy import Enum, Float
-import enum
-
 # 题目类型枚举
 class QuestionType(str, enum.Enum):
     choice = "choice"  # 选择题
@@ -203,13 +200,15 @@ class Question(Base):
 
 # 学习记录模型
 class LearningRecord(Base):
-    __tablename__ = "learning_record"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    student_id = Column(Integer, nullable=False)  # 学生ID（关联users表id）
-    knowledge_id = Column(String(100), nullable=False)  # 知识点节点ID
-    progress = Column(Float, default=0.0)  # 掌握度（0~1）
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())  # 最后更新时间
+    __tablename__ = "learning_records"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    student_id = Column(Integer, nullable=False)
+    resource_id = Column(String(64), ForeignKey('file_resources.file_id'), nullable=False)
+    status = Column(Integer, nullable=False)
+    total_time = Column(Integer, nullable=False)
+    page_times = Column(Text)
+    timestamp = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())  # 最后更新时间
 
 # 答题记录模型
 class QuestionRecord(Base):
@@ -224,29 +223,9 @@ class QuestionRecord(Base):
     detail = Column(Text, nullable=False)  # 答题详情（JSON格式）
     total_questions = Column(Integer, nullable=False)  # 题目数量
 
-class KnowledgePoint(Base):
-    __tablename__ = "knowledge_points"
-
-    id = Column(String(64), primary_key=True, index=True)
-    name = Column(String(128), nullable=False)
-    category = Column(String(32), nullable=False)
-
-class Resource(Base):
-    __tablename__ = "resources"
-
-    id = Column(String(64), primary_key=True)
-    name = Column(String(128), nullable=False)
-    
-class KnowledgeResourceLink(Base):
-    __tablename__ = "knowledge_resource_links"
-
-    knowledge_id = Column(String(64), ForeignKey('knowledge_points.id'), primary_key=True)
-    resource_id = Column(String(64), ForeignKey('resources.id'), primary_key=True)
-    is_child = Column(Integer, nullable=False, default=0)
-
 class Mastery(Base):
     __tablename__ = "mastery"
 
     student_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
-    knowledge_id = Column(String(64), ForeignKey('knowledge_points.id'), primary_key=True)
+    knowledge_id = Column(String(64), primary_key=True)
     mastery = Column(Float, nullable=False)

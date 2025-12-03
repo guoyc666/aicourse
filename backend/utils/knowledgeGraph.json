@@ -1,5 +1,4 @@
 {
-  "course": "大数据分析",
   "nodes": [
     {
       "id": "root",
@@ -50,15 +49,15 @@
       "description": "分析大数据在实际应用中的机遇与挑战。"
     }
   ],
-  "links": [
-    { "source": "root", "target": "concept", "relation": "包含" },
+  "edges": [
+    { "source": "root", "target": "base_concept", "relation": "包含" },
     { "source": "root", "target": "acquisition", "relation": "包含" },
     { "source": "root", "target": "quality", "relation": "包含" },
     { "source": "root", "target": "storage", "relation": "包含" },
     { "source": "root", "target": "processing", "relation": "包含" },
     { "source": "root", "target": "platform", "relation": "包含" },
     { "source": "root", "target": "application", "relation": "包含" },
-    { "source": "concept", "target": "acquisition", "relation": "前置" },
+    { "source": "base_concept", "target": "acquisition", "relation": "前置" },
     { "source": "acquisition", "target": "quality", "relation": "前置" },
     { "source": "quality", "target": "storage", "relation": "前置" },
     { "source": "storage", "target": "processing", "relation": "前置" },

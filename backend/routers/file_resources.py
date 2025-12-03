@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional
 
+from crud.records import delete_learning_records_by_resource
 from database import get_db
 from models import FileResource, User
 from auth import get_current_user
@@ -16,10 +17,7 @@ from schemas import FileResourceResponse
 from config import config  # 导入配置对象
 
 # 创建路由对象
-router = APIRouter(
-    prefix="",
-    tags=["文件资源"]
-)
+router = APIRouter()
 
 # 1.资源上传接口
 def get_unique_filename(original_filename: str) -> str:
@@ -55,7 +53,8 @@ def _analyze_file_task(
     filepath: str,
     fileid: str,
     file_type: str,
-    download_url: str
+    download_url: str,
+    is_sync: bool = False,
 ):
     """后台任务：解析文件并存入向量数据库"""
     from utils.parse_file import analyse_file  # 延迟导入，避免循环依赖
@@ -66,14 +65,16 @@ def _analyze_file_task(
         fileid=fileid,
         file_type=file_type,
         download_url=download_url,
+        is_sync=is_sync,
     )
 
-@router.post(config.api.UPLOAD_ENDPOINT, summary="上传资源文件")
+@router.post("/resource/upload", summary="上传资源文件")
 async def upload_resource(
     file: UploadFile = File(...),
     title: str = Form(..., description="文件标题"),
     type: str = Form(..., description="文件类型分类"),
     description: Optional[str] = Form(None, description="资源详细描述（可选）"),
+    sync_knowledge: Optional[bool] = Form(False, description="是否同步到知识图谱"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     background_tasks: BackgroundTasks = BackgroundTasks()
@@ -176,6 +177,7 @@ async def upload_resource(
             fileid=file_id,
             file_type=type,
             download_url=download_url,
+            is_sync=sync_knowledge,
         )
 
         return JSONResponse(
@@ -202,7 +204,7 @@ async def upload_resource(
         )
 
 # 2.获取文件列表（支持搜索和分页）
-@router.get(f"{config.api.BASE_PATH}/resources", summary="获取文件资源列表")
+@router.get(f"/resources", summary="获取文件资源列表")
 async def get_resources(
     skip: int = 0,
     limit: int = 10,
@@ -251,7 +253,7 @@ async def get_resources(
     }
 
 # 3.删除文件
-@router.delete(f"{config.api.BASE_PATH}/resources/{{file_id}}", summary="删除文件资源")
+@router.delete("/resources/{file_id}", summary="删除文件资源")
 async def delete_resource(
     file_id: str,
     current_user: User = Depends(get_current_user),
@@ -274,15 +276,22 @@ async def delete_resource(
     # 删除文件
     if os.path.exists(db_file.storage_path):
         os.remove(db_file.storage_path)
+
+    # 同步删除所有学习记录
+    delete_learning_records_by_resource(db, file_id)
     
     # 从数据库删除
     db.delete(db_file)
     db.commit()
+
+    # 从图数据库中删除相关节点
+    from crud.graph import delete_node
+    delete_node(file_id)
     
     return {"message": "文件删除成功"}
 
 # 5.文件下载端点（位于编辑端点之后）
-@router.get(f"{config.api.DOWNLOAD_URL_PREFIX}/{{filename:path}}", summary="下载文件资源")
+@router.get("/resources/{filename:path}", summary="下载文件资源")
 async def download_file(
     filename: str,
     # 完全移除用户认证，任何人都可以访问文件
@@ -344,7 +353,7 @@ async def download_file(
         )
 
 # 4.编辑资源信息
-@router.put(f"{config.api.BASE_PATH}/resources/{{file_id}}", summary="编辑资源信息")
+@router.put("/resources/{file_id}", summary="编辑资源信息")
 async def update_resource(
     file_id: str,
     request_data: dict,  # 使用字典接收JSON数据

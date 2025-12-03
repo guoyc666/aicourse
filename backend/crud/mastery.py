@@ -1,53 +1,100 @@
 import json
-from models import KnowledgePoint, Mastery
-from models import QuestionRecord, Question
-from db.neo4j import get_graph
+from models import Mastery, QuestionRecord, Question
+from neo4j import get_graph
 from sqlalchemy.orm import Session
+from crud.graph import get_all_knowledge_points, get_all_students
 
-def get_mastery(db: Session, student_id: str, knowledge_id: str):
-    return db.query(Mastery).filter(
+def get_mastery(db: Session, student_id: int, knowledge_id: str):
+    mastery = db.query(Mastery).filter(
         Mastery.student_id == student_id,
         Mastery.knowledge_id == knowledge_id
     ).first()
+    if not mastery:
+        return {
+            "knowledge_id": knowledge_id,
+            "mastery": 0.0
+        }
+    return mastery
 
-def get_mastery_list(db: Session, student_id: str = None):
-    query = db.query(Mastery)
-    if student_id:
-        query = query.filter(Mastery.student_id == student_id)
-    return query.all()
+def list_mastery(db: Session, student_id: int):
+    # 获取所有知识点
+    all_knowledge_points = get_all_knowledge_points()
+    masteries = db.query(Mastery).filter(
+        Mastery.student_id == student_id
+    ).all()
+    mastery_map = {m.knowledge_id: m.mastery for m in masteries}
+    mastery_list = [
+        {
+            "knowledge_id": kp_id,
+            "mastery": mastery_map.get(kp_id, 0.0)
+        }
+        for kp_id in all_knowledge_points
+    ]
+    return mastery_list
+
+def get_mastery_list(db: Session, knowledge_id: str):
+    students = get_all_students(db)
+    masteries = db.query(Mastery).filter(
+        Mastery.knowledge_id == knowledge_id
+    ).all()
+    result = []
+    for s in students:
+        mastery_record = next((m for m in masteries if m.student_id == s.id), None)
+        mastery_value = mastery_record.mastery if mastery_record else 0.0
+        result.append({
+            "knowledge_id": knowledge_id,
+            "mastery": mastery_value,
+            "student_id": s.id,
+            "student_name": s.full_name
+        })
+    return result
+
+def list_mastery_list(db: Session):
+    students = get_all_students(db)
+    # 获取所有知识点
+    all_knowledge_points = get_all_knowledge_points()
+    # 获取所有掌握度
+    all_masteries = db.query(Mastery).all()
+    # 构建掌握度映射
+    mastery_map = {}
+    for m in all_masteries:
+        mastery_map.setdefault(m.knowledge_id, {})[m.student_id] = m.mastery
+
+    result = []
+    for kp_id in all_knowledge_points:
+        for s in students:
+            mastery_value = mastery_map.get(kp_id, {}).get(s.id, 0.0)
+            result.append({
+                "knowledge_id": kp_id,
+                "mastery": mastery_value,
+                "student_id": s.id,
+                "student_name": s.full_name
+            })
+    return result
 
 def get_average_mastery(db: Session, knowledge_id: str):
     masteries = db.query(Mastery).filter(Mastery.knowledge_id == knowledge_id).all()
     if not masteries:
-        return 0.0
+        return {
+            "knowledge_id": knowledge_id,
+            "average_mastery": 0.0
+        }
     total = sum(m.mastery for m in masteries)
-    return total / len(masteries)
+    return {
+        "knowledge_id": knowledge_id,
+        "average_mastery": total / len(masteries)
+    }
 
-def get_average_mastery_list(db: Session):
-    knowledge_points = db.query(KnowledgePoint).all()
+def list_average_mastery(db: Session):
+    all_knowledge_points = get_all_knowledge_points()
     avg_mastery_list = []
-    for kp in knowledge_points:
-        avg_mastery = get_average_mastery(db, kp.id)
+    for kp_id in all_knowledge_points:
+        avg_mastery = get_average_mastery(db, kp_id)
         avg_mastery_list.append({
-            "knowledge_id": kp.id,
-            "mastery": avg_mastery
+            "knowledge_id": kp_id,
+            "average_mastery": avg_mastery["average_mastery"]
         })
     return avg_mastery_list
-
-def create_mastery(db: Session, mastery_data: dict):
-    mastery = Mastery(**mastery_data)
-    db.add(mastery)
-    db.commit()
-    db.refresh(mastery)
-    return mastery
-
-def update_mastery(db: Session, student_id: str, knowledge_id: str, mastery_score: float):
-    mastery = get_mastery(db, student_id, knowledge_id)
-    if mastery:
-        mastery.mastery = mastery_score
-        db.commit()
-        db.refresh(mastery)
-    return mastery
 
 
 # 掌握度计算依赖于答题结果
@@ -77,7 +124,7 @@ def calc_mastery(student_id: str, db: Session):
                 }
     
     # 获取知识点列表
-    all_knowledge_points = db.query(KnowledgePoint).all()
+    all_knowledge_points = get_all_knowledge_points()
 
     # 获取题库
     # question: [{'question_id', 'type', 'difficulty', 'knowledge_id'}]
@@ -85,10 +132,10 @@ def calc_mastery(student_id: str, db: Session):
     # 对于all_knowledge_points中的每个知识点，在all_questions中找到相关题目列表，从record_map中找到对应的答题记录，计算加权正确率和平均答题速度
     all_questions = db.query(Question).all()
     mastery_results = {}
-    for kp in all_knowledge_points:
-        related_questions = [q for q in all_questions if kp.id in json.loads(q.knowledge_id)]
+    for kp_id in all_knowledge_points:
+        related_questions = [q for q in all_questions if kp_id in json.loads(q.knowledge_id)]
         if not related_questions:
-            mastery_results[kp.id] = 0.0
+            mastery_results[kp_id] = 0.0
             continue
         
         total_difficulty = 0.0
@@ -105,7 +152,7 @@ def calc_mastery(student_id: str, db: Session):
                 total_time += rec['time']
         
         if answered_count == 0 or total_difficulty == 0:
-            mastery_results[kp.id] = 0.0
+            mastery_results[kp_id] = 0.0
             continue
 
         weighted_accuracy = weighted_correctness / total_difficulty
@@ -119,6 +166,22 @@ def calc_mastery(student_id: str, db: Session):
             speed_score = max(0.6, 1.0 - (avg_time - standard_time) / (5 * standard_time))
 
         mastery_score = weighted_accuracy * speed_score
-        mastery_results[kp.id] = mastery_score
+        mastery_results[kp_id] = mastery_score
+
+        # 写入数据库 
+        mastery_obj = db.query(Mastery).filter(
+            Mastery.student_id == student_id,
+            Mastery.knowledge_id == kp_id
+        ).first()
+        if mastery_obj:
+            mastery_obj.mastery = mastery_score
+        else:
+            mastery_obj = Mastery(
+                student_id=student_id,
+                knowledge_id=kp_id,
+                mastery=mastery_score
+            )
+            db.add(mastery_obj)
+    db.commit()
     
     return mastery_results

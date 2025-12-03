@@ -33,7 +33,12 @@
           
           <el-menu-item index="/student-progress">
             <el-icon><DataAnalysis /></el-icon>
-            <template #title>学生学习状况</template>
+            <template #title>学生答题记录</template>
+          </el-menu-item>
+
+          <el-menu-item index="/records">
+            <el-icon><TrendCharts /></el-icon>
+            <template #title>学生学习情况</template>
           </el-menu-item>
           
           <!-- 仅管理员可见 -->
@@ -65,10 +70,20 @@
             <el-icon><Guide /></el-icon>
             <template #title>学习路径</template>
           </el-menu-item>
+
+          <el-menu-item index="/knowledge-graph">
+            <el-icon><Share /></el-icon>
+            <template #title>知识图谱</template>
+          </el-menu-item>
           
           <el-menu-item index="/visualization">
             <el-icon><TrendCharts /></el-icon>
             <template #title>学习可视化</template>
+          </el-menu-item>
+
+          <el-menu-item index="/records">
+            <el-icon><TrendCharts /></el-icon>
+            <template #title>学习情况</template>
           </el-menu-item>
           
           <el-menu-item index="/student-tasks">

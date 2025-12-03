@@ -40,7 +40,7 @@ const router = createRouter({
           path: 'knowledge-graph',
           name: 'KnowledgeGraph',
           component: () => import('@/views/KnowledgeGraph/index.vue'),
-          meta: { title: '知识图谱管理', roles: ['teacher', 'admin'] }
+          meta: { title: '知识图谱', roles: ['teacher', 'admin', 'student'] }
         },
 
         {
@@ -63,6 +63,12 @@ const router = createRouter({
           meta: { title: '学习过程可视化', roles: ['student'] }
         },
         {
+          path: 'records',
+          name: 'records',
+          component: () => import('@/views/LearningRecordsView/index.vue'),
+          meta: { title: '学习情况', roles: ['teacher', 'admin', 'student'] }
+        },
+        {
           path: 'ai-assistant/:conv_id?',
           name: 'AIAssistant',
           component: () => import('@/views/AIAssistant/index.vue'),
@@ -78,7 +84,7 @@ const router = createRouter({
           path: 'student-progress',
           name: 'StudentProgress',
           component: () => import('@/views/StudentProgress/index.vue'),
-          meta: { title: '学生学习状况', roles: ['teacher', 'admin'] } 
+          meta: { title: '学生答题记录', roles: ['teacher', 'admin'] } 
         },
           
         {
