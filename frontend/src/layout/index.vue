@@ -33,12 +33,12 @@
           
           <el-menu-item index="/student-progress">
             <el-icon><DataAnalysis /></el-icon>
-            <template #title>学生学习状况</template>
+            <template #title>学生答题记录</template>
           </el-menu-item>
 
           <el-menu-item index="/records">
             <el-icon><TrendCharts /></el-icon>
-            <template #title>学习情况</template>
+            <template #title>学生学习情况</template>
           </el-menu-item>
           
           <!-- 仅管理员可见 -->

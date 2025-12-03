@@ -3,7 +3,7 @@
     <el-card class="page-card">
       <template #header>
         <div class="card-header">
-          <span>学生学习状况</span>
+          <span>学生答题记录</span>
         </div>
       </template>
 

@@ -22,6 +22,7 @@ class ConceptNode(BaseNode):
 
 class ResourceNode(BaseNode):
     category: Literal["Resource"]
+    download_url: str
     type: str
 
 class ResourceSimpleInfo(BaseModel):
@@ -50,6 +51,7 @@ class ResourceInfo(BaseModel):
     id: str
     name: str
     type: str
+    download_url: str
     is_child: bool = False
 
 class NodeRef(BaseModel):

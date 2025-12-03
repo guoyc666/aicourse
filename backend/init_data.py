@@ -194,6 +194,16 @@ def init_topics_data():
     db.close()
     print("讨论区数据初始化完成！")
 
+def init_knowledge_graph():
+    from neo4j import get_graph
+    graph = get_graph()
+    # 如果没有节点，则初始化知识图谱
+    if not graph.nodes.match().first():
+        from utils.graph_api_utils import nodes, edges
+        from crud.graph import save_knowledge_graph
+        save_knowledge_graph(nodes, edges)
+        print("知识图谱初始化完成！")
+
 def init_all():
     """初始化所有数据"""
     print("创建数据库表...")
@@ -210,10 +220,14 @@ def init_all():
     
     print("初始化讨论区数据...")
     init_topics_data()
+
+    print("初始化知识图谱...")
+    init_knowledge_graph()  
     
     print("初始化完成！")
     print("默认管理员账号：admin")
     print("默认管理员密码：admin123")
+    
 
 if __name__ == "__main__":
     init_all()

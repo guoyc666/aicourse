@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional
 
+from crud.records import delete_learning_records_by_resource
 from database import get_db
 from models import FileResource, User
 from auth import get_current_user
@@ -52,7 +53,8 @@ def _analyze_file_task(
     filepath: str,
     fileid: str,
     file_type: str,
-    download_url: str
+    download_url: str,
+    is_sync: bool = False,
 ):
     """后台任务：解析文件并存入向量数据库"""
     from utils.parse_file import analyse_file  # 延迟导入，避免循环依赖
@@ -63,6 +65,7 @@ def _analyze_file_task(
         fileid=fileid,
         file_type=file_type,
         download_url=download_url,
+        is_sync=is_sync,
     )
 
 @router.post("/resource/upload", summary="上传资源文件")
@@ -71,6 +74,7 @@ async def upload_resource(
     title: str = Form(..., description="文件标题"),
     type: str = Form(..., description="文件类型分类"),
     description: Optional[str] = Form(None, description="资源详细描述（可选）"),
+    sync_knowledge: Optional[bool] = Form(False, description="是否同步到知识图谱"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     background_tasks: BackgroundTasks = BackgroundTasks()
@@ -173,6 +177,7 @@ async def upload_resource(
             fileid=file_id,
             file_type=type,
             download_url=download_url,
+            is_sync=sync_knowledge,
         )
 
         return JSONResponse(
@@ -271,10 +276,17 @@ async def delete_resource(
     # 删除文件
     if os.path.exists(db_file.storage_path):
         os.remove(db_file.storage_path)
+
+    # 同步删除所有学习记录
+    delete_learning_records_by_resource(db, file_id)
     
     # 从数据库删除
     db.delete(db_file)
     db.commit()
+
+    # 从图数据库中删除相关节点
+    from crud.graph import delete_node
+    delete_node(file_id)
     
     return {"message": "文件删除成功"}
 

@@ -9,12 +9,18 @@ from .chroma_manager import VectorStore
 from .graph_utils import addResourseToGraph
 
 
-def analyse_file(filename, filepath, fileid, download_url, file_type):
+def analyse_file(filename, filepath, fileid, download_url, file_type, is_sync=False):
     """解析文件并存入向量数据库"""
     try:
         text = extract_text(filepath, file_type)
         print(text[:100])
-        addResourseToGraph(fileid, filename, file_type, text)
+        if is_sync:
+            addResourseToGraph(
+                id=fileid,
+                name=filename,
+                type=file_type,
+                content=text
+            )
         chunks = chunk_text(text)
         docs, metas, ids = [], [], []
         

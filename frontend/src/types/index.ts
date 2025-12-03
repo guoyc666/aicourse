@@ -81,6 +81,7 @@ export type NodeDetail = {
     id: string;
     name: string;
     type: string;                // 资源类型，如视频、文档、PPT等
+    download_url: string;     // 资源下载链接
     is_child: boolean;          // 是否来自子节点
   }>;
   prerequisites: Array<{

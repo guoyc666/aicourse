@@ -8,19 +8,18 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onUnmounted } from "vue";
 
 import CytoGraph from "./CytoGraph.vue";
 import Siderbar from "./Siderbar.vue";
 
 
 import { useGraphStore } from "../../stores/graphStore";
-import { useAnalysisStore } from "../../stores/analysisStore";
 
 const graphStore = useGraphStore();
-const analysisStore = useAnalysisStore();
 
-onMounted(async () => {
+onUnmounted(() => {
+  graphStore.unSelectNode();
 });
 </script>
 

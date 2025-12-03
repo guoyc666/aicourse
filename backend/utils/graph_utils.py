@@ -187,7 +187,7 @@ def getAnswer(course_prompt, CONTENT: str):
     )
     return response.choices[0].message.content
 
-def addResourseToGraph(id: str, name: str, type: str, CONTENT: str):
+def addResourseToGraph(id: str, name: str, type: str, download_url: str, CONTENT: str):
     knowledge_graph = load_knowledge_graph(kg_path)
     prompt = build_course_prompt(knowledge_graph)
     result_str = getAnswer(prompt, CONTENT)

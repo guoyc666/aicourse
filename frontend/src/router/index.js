@@ -84,7 +84,7 @@ const router = createRouter({
           path: 'student-progress',
           name: 'StudentProgress',
           component: () => import('@/views/StudentProgress/index.vue'),
-          meta: { title: '学生学习状况', roles: ['teacher', 'admin'] } 
+          meta: { title: '学生答题记录', roles: ['teacher', 'admin'] } 
         },
           
         {

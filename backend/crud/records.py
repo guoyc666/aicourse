@@ -110,6 +110,10 @@ def delete_learning_records_by_date_and_student(db: Session, date_str, student_i
     ).delete(synchronize_session=False)
     db.commit()
 
+def delete_learning_records_by_resource(db: Session, resource_id: str):
+    db.query(LearningRecord).filter(LearningRecord.resource_id == resource_id).delete(synchronize_session=False)
+    db.commit()
+
 
 def get_study_time(db: Session, student_id: int, knowledge_id: str):
     resource_ids = get_resources_by_knowledge(knowledge_id)

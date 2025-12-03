@@ -615,6 +615,25 @@ const handleUpload = async () => {
     if (valid && uploadForm.file) {
       uploading.value = true
       try {
+        let syncKnowledge = false;
+        try {
+          await ElMessageBox.confirm(
+            '是否同步提取知识点到知识图谱？',
+            '同步知识点',
+            {
+              confirmButtonText: '是',
+              cancelButtonText: '否',
+              distinguishCancelAndClose: true,
+              showCancelButton: true,
+              showClose: true,
+              type: 'info'
+            }
+          );
+          syncKnowledge = true; // 用户点击“是”
+        } catch {
+          syncKnowledge = false; // 用户点击“否”或关闭
+        }
+
         // 调用实际的API，确保参数名称与后端匹配
         const formData = new FormData()
         formData.append('file', uploadForm.file)
@@ -622,6 +641,8 @@ const handleUpload = async () => {
         formData.append('description', uploadForm.description || '')
         // 注意：后端参数名是'type'，不是'file_type'
         formData.append('type', uploadForm.file_type)
+        formData.append('sync_knowledge', syncKnowledge ? '1' : '0')
+
         
         const response = await uploadResource(formData)
         

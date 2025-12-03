@@ -16,7 +16,7 @@
               v-if="!isStudent"
               prop="student_name"
               label="学生姓名"
-              width="180"
+              width="120"
               :filters="studentNameFilters"
               :filter-method="filterStudentName"
             />
@@ -34,7 +34,7 @@
               :filters="knowledgeNameFilters"
               :filter-method="filterKnowledgeName"
             />
-            <el-table-column prop="mastery" label="掌握度" width="120" sortable>
+            <el-table-column fixed="right"prop="mastery" label="掌握度" width="120" sortable>
               <template #default="scope">
                 {{ (scope.row.mastery * 100).toFixed(2) }}%
               </template>
@@ -64,7 +64,7 @@
               v-if="!isStudent"
               prop="student_name"
               label="学生姓名"
-              width="180"
+              width="120"
               :filters="studentNameFilters"
               :filter-method="filterStudentName"
             />
@@ -82,7 +82,7 @@
               :filters="knowledgeNameFilters"
               :filter-method="filterKnowledgeName"
             />
-            <el-table-column prop="progress" label="进度" width="120" sortable>
+            <el-table-column fixed="right" prop="progress" label="进度" width="120" sortable>
               <template #default="scope">
                 {{ (scope.row.progress * 100).toFixed(2) }}%
               </template>

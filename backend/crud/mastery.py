@@ -167,5 +167,21 @@ def calc_mastery(student_id: str, db: Session):
 
         mastery_score = weighted_accuracy * speed_score
         mastery_results[kp_id] = mastery_score
+
+        # 写入数据库 
+        mastery_obj = db.query(Mastery).filter(
+            Mastery.student_id == student_id,
+            Mastery.knowledge_id == kp_id
+        ).first()
+        if mastery_obj:
+            mastery_obj.mastery = mastery_score
+        else:
+            mastery_obj = Mastery(
+                student_id=student_id,
+                knowledge_id=kp_id,
+                mastery=mastery_score
+            )
+            db.add(mastery_obj)
+    db.commit()
     
     return mastery_results

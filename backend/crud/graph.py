@@ -43,7 +43,7 @@ def get_all_students(db: Session):
     if not student_role:
         return []
     # 查询所有拥有学生角色的用户
-    student_ids = db.query(UserRole.user_id).filter(UserRole.role_id == student_role.id).subquery()
+    student_ids = db.query(UserRole.user_id).filter(UserRole.role_id == student_role.id)
     students = db.query(User).filter(User.id.in_(student_ids)).all()
     return students
 
@@ -94,10 +94,10 @@ def get_node_detail(db: Session, node_id: str, user_id: int, is_student: bool):
     # 查询所有资源
     resource_query = f"""
     MATCH (k:Concept {{id: '{node_id}'}})-[:关联]->(r:Resource)
-    RETURN r.id AS id, r.name AS name, r.type AS type, false AS is_child
+    RETURN r.id AS id, r.name AS name, r.type AS type, r.download_url AS download_url, false AS is_child
     UNION
     MATCH (k:Concept {{id: '{node_id}'}})-[:包含*1..]->(sub:Concept)-[:关联]->(r:Resource)
-    RETURN DISTINCT r.id AS id, r.name AS name, r.type AS type, true AS is_child
+    RETURN DISTINCT r.id AS id, r.name AS name, r.type AS type, r.download_url AS download_url, true AS is_child
     """
     resources = graph.run(resource_query).data()
 
@@ -234,7 +234,7 @@ def delete_node(node_id: str):
     graph = get_graph()
     n = graph.nodes.match(id=node_id).first()
     if n:
-        graph.delete(n)
+        graph.run("MATCH (n {id: $id}) DETACH DELETE n", id=node_id)
 
 def create_edge(edge: Dict[str, Any]):
     graph = get_graph()

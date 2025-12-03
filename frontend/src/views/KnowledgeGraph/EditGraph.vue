@@ -128,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, computed } from "vue";
+import { ref, nextTick, computed, watch } from "vue";
 import cytoscape from "cytoscape";
 import type { CytoscapeElements, CytoscapeNode } from '../../types';
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -181,6 +181,19 @@ function collectChildIds(nodeId: string, edges: CytoscapeElements["edges"]): str
   return result;
 }
 
+const collectAncestorIds = (nodeId: string, edges: CytoscapeElements["edges"]) => {
+  const result: string[] = [];
+  function dfs(id: string) {
+    const parentEdge = edges.find(e => e.data.target === id && e.data.relation === "包含");
+    if (parentEdge) {
+      result.push(parentEdge.data.source);
+      dfs(parentEdge.data.source);
+    }
+  }
+  dfs(nodeId);
+  return result;
+};
+
 function updateParentNodeList(selectedId: string) {
   // 找出所有以自身为前置节点的节点 id
   const nodesWithSelfAsPrerequisite = props.elements.edges
@@ -202,33 +215,53 @@ function updateParentNodeList(selectedId: string) {
 
 const preNodeList = computed(() => {
   if (!graphStore.selectedNodeID) return [];
+  const newParentId = editForm.value.parentId;
   const selectedNodeId = graphStore.selectedNodeID;
-  const parentId = editForm.value.parentId;
   const childIds = collectChildIds(selectedNodeId, props.elements.edges);
+  const ancestorIds = collectAncestorIds(newParentId, props.elements.edges);
+
   // 找出所有以自身为前置节点的节点 id
   const nodesWithSelfAsPrerequisite = props.elements.edges
     .filter(e => e.data.source === selectedNodeId && e.data.relation === "前置")
     .map(e => e.data.target);
+
+  const excludeIds = new Set([
+    selectedNodeId,
+    ...childIds,
+    newParentId,
+    ...ancestorIds,
+    ...nodesWithSelfAsPrerequisite,
+  ]);
   return props.elements.nodes
-    .filter((n) => 
-      n.data.category === "Concept" &&
-      n.data.id !== selectedNodeId &&      // 不显示自身
-      n.data.id !== parentId &&            // 不显示父节点
-      !childIds.includes(n.data.id) &&     // 不显示子节点
-      !nodesWithSelfAsPrerequisite.includes(n.data.id) // 不显示以自身为前置节点的节点
-    )
+    .filter((n) => n.data.category === "Concept" && !excludeIds.has(n.data.id))
     .map((n) => ({
       id: n.data.id,
       name: n.data.name,
     }));
 });
 
-const filteredPrerequisiteNodes = computed(() => {
-  const { parentId, prerequisiteNodes } = editForm.value;
-  const result = { ...prerequisiteNodes };
-  delete result[parentId];
-  return result;
-});
+const filteredPrerequisiteNodes = ref<Record<string, string>>({});
+
+watch(
+  () => editForm.value.parentId,
+  (newParentId) => {
+    const ancestorIds = collectAncestorIds(newParentId, props.elements.edges);
+
+    const excludeIds = new Set([
+      ...ancestorIds,
+      newParentId,
+    ]);
+
+    const result: Record<string, string> = {};
+    for (const [id, name] of Object.entries(editForm.value.prerequisiteNodes)) {
+      if (!excludeIds.has(id)) {
+        result[id] = name;
+      }
+    }
+    filteredPrerequisiteNodes.value = result;
+  },
+  { immediate: true }
+);
 
 const resNodeList = computed(() => {
   return graphStore.resources.map((r) => ({

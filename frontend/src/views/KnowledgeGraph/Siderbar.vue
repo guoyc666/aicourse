@@ -7,8 +7,16 @@
         <section class="detail-section">
           <div class="section-title">知识点解释</div>
           <div class="section-content">
-            {{ graphStore.nodeDetail?.description || "暂无描述" }}
-            <span v-if="graphStore.nodeDetail?.description && graphStore.nodeDetail?.description.length > 60" class="expand-link">展开</span>
+            <span>
+              {{ showFullDesc ? graphStore.nodeDetail?.description : (graphStore.nodeDetail?.description?.slice(0, 60) + '...') }}
+            </span>
+            <span
+              v-if="graphStore.nodeDetail?.description && graphStore.nodeDetail?.description.length > 60"
+              class="expand-link"
+              @click="showFullDesc = !showFullDesc"
+            >
+              {{ showFullDesc ? '收起' : '展开' }}
+            </span>
           </div>
         </section>
         <!-- 学情概览 -->
@@ -85,13 +93,44 @@
         <section class="detail-section">
           <div class="section-title">本课资源</div>
           <div v-if="graphStore.nodeDetail?.resources && graphStore.nodeDetail?.resources.length">
-            <div v-for="res in graphStore.nodeDetail?.resources" :key="res.id" class="resource-item">
+            <div
+              v-for="res in graphStore.nodeDetail?.resources"
+              :key="res.id"
+              class="resource-item"
+              style="cursor:pointer;"
+              @click="handlePreviewResource(res)"
+            >
               <div class="resource-type">{{ res.type }}</div>
               <div class="resource-name">{{ res.name }}</div>
               <div class="resource-desc" v-if="res.is_child">来自子节点</div>
             </div>
           </div>
           <div v-else class="empty-tip">暂无资源</div>
+
+          <el-dialog
+            v-model="previewVisible"
+            :title="previewTitle"
+            width="60%"
+            @close="handleDialogClose"
+          >
+            <template v-if="previewType === 'video'">
+              <video :src="previewUrl" controls style="width:100%;max-height:500px;" />
+            </template>
+            <template v-else-if="previewType === 'image'">
+              <img :src="previewUrl" style="max-width:100%;max-height:500px;" />
+            </template>
+            <template v-else-if="previewType === 'pdf'">
+              <iframe :src="previewUrl" width="100%" height="500px" />
+            </template>
+            <template v-else-if="previewType === 'txt' || previewType === 'text'">
+              <div style="white-space: pre-wrap; max-height:500px; overflow:auto;">
+                {{ previewContent }}
+              </div>
+            </template>
+            <template v-else>
+              <a :href="previewUrl" target="_blank">下载/预览资源</a>
+            </template>
+          </el-dialog>
         </section>
       </el-tab-pane>
     </el-tabs>
@@ -99,14 +138,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { useGraphStore } from "../../stores/graphStore";
 import { useAnalysisStore } from "../../stores/analysisStore";
 import { useUserStore } from "../../stores/user";
+import type { NodeDetail } from "../../types";
+import {
+  trackVideoResource,
+  trackImageResource,
+  trackDocumentResource,
+  trackPagingResource
+} from "../../composable/useProgressTracker";
 
 const userStore = useUserStore();
 
 const isStudent = userStore.hasRole("student")
+const showFullDesc = ref(false);
 
 const detailTab = ref('overview');
 const graphStore = useGraphStore();
@@ -121,6 +168,94 @@ const progressPercent = computed(() => {
   const progress = analysisStore.getProgressByKnowledgeId(graphStore.selectedNodeID!);
   return +(progress * 100).toFixed(2);
 });
+
+const previewVisible = ref(false);
+const previewType = ref("");
+const previewTitle = ref("");
+const previewUrl = ref("");
+const previewContent = ref("");
+
+// 追踪器清理函数
+let cleanupTracker: (() => void) | null = null;
+
+function handlePreviewResource(res: NodeDetail["resources"][number]) {
+  previewType.value = res.type.toLowerCase();
+  previewTitle.value = res.name;
+  previewUrl.value = res.download_url;
+  previewVisible.value = true;
+  previewContent.value = "";
+
+  // 清理上一次追踪
+  if (cleanupTracker) {
+    cleanupTracker();
+    cleanupTracker = null;
+  }
+
+  // 视频
+  if (previewType.value === "video") {
+    nextTick(() => {
+      const videoEl = document.querySelector(".el-dialog video") as HTMLVideoElement;
+      if (videoEl) {
+        cleanupTracker = trackVideoResource(res.id, videoEl);
+      }
+    });
+  }
+  // 图片
+  else if (previewType.value === "image") {
+    cleanupTracker = trackImageResource(res.id);
+  }
+  // 文档（pdf、txt、text、doc、docx等）
+  else if (["pdf", "txt", "text", "doc", "docx"].includes(previewType.value)) {
+    if (["txt", "text"].includes(previewType.value)) {
+      // 文本内容异步加载
+      fetch(previewUrl.value)
+        .then(resp => resp.text())
+        .then(text => {
+          previewContent.value = text;
+        })
+        .catch(() => {
+          previewContent.value = "内容加载失败";
+        });
+    }
+    nextTick(() => {
+      // pdf、doc等用iframe，txt用div，但都可以监听el-dialog内容区的滚动
+      let scrollEl: HTMLElement | null = null;
+      if (previewType.value === "pdf" || previewType.value === "doc" || previewType.value === "docx") {
+        const iframe = document.querySelector(".el-dialog iframe") as HTMLIFrameElement;
+        if (iframe && iframe.contentDocument) {
+          scrollEl = iframe.contentDocument.scrollingElement as HTMLElement;
+        }
+      } else {
+        // txt/text用el-dialog内容区
+        scrollEl = document.querySelector(".el-dialog__body div[style*='pre-wrap']") as HTMLElement;
+      }
+      if (scrollEl) {
+        cleanupTracker = trackDocumentResource(res.id, scrollEl);
+      }
+    });
+  }
+  // PPT（分页资源，举例，需你根据实际情况传 totalPages）
+  else if (previewType.value === "ppt") {
+    // 假设你能获取总页数 totalPages
+    const totalPages = 10; // 示例
+    const tracker = trackPagingResource(res.id, totalPages);
+    // 你需要在分页切换时调用 tracker.onPageChange(newPage)
+    // 关闭弹窗时调用 tracker.onPPTClosed()
+    cleanupTracker = tracker.onPPTClosed;
+  }
+}
+
+function handleDialogClose() {
+  previewVisible.value = false;
+  previewType.value = "";
+  previewTitle.value = "";
+  previewUrl.value = "";
+  previewContent.value = "";
+  if (cleanupTracker) {
+    cleanupTracker();
+    cleanupTracker = null;
+  }
+}
 
 </script>
 

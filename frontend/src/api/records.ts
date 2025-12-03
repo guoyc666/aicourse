@@ -14,6 +14,7 @@ export const recordsAPI = {
   },
   // 添加学习记录
   async addLearningRecord(record: LearningRecord) {
+    console.log("Adding learning record:", record);
     const res = await api.post(`/api/records/`, record);
     return res; // 应返回添加成功的记录
   },
