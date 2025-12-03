@@ -1,7 +1,9 @@
+import json
 from typing import List, Dict, Any
 from py2neo import Node, Relationship
 from neo4j import get_graph
-from models import FileResource, LearningRecord
+from schemas_.graph import KnowledgeInfo
+from models import Question, LearningRecord
 from sqlalchemy.orm import Session
 
 def get_all_knowledge_points():
@@ -14,14 +16,31 @@ def get_all_knowledge_points():
     knowledge_ids = [kp["id"] for kp in knowledge_points]
     return knowledge_ids
 
-def get_all_knowledge_nodes():
+def get_all_knowledge_nodes(db: Session):
     graph = get_graph()
     knowledge_query = """
     MATCH (k:Concept)
     RETURN k.id AS id, k.name AS name
     """
     knowledge_points = graph.run(knowledge_query).data()
-    return knowledge_points
+    # 获取所有题库题目
+    questions = db.query(Question).all()
+    result = []
+    for kp in knowledge_points:
+        kp_id = kp["id"]
+        kp_name = kp["name"]
+        # 统计题目数量（knowledge_id为JSON格式的ID列表）
+        count = 0
+        for q in questions:
+            try:
+                knowledge_ids = json.loads(q.knowledge_id)
+            except Exception:
+                knowledge_ids = []
+            if kp_id in knowledge_ids:
+                count += 1
+        info = KnowledgeInfo(id=kp_id, name=kp_name, question_count=count)
+        result.append(info)
+    return result
 
 def get_resources_by_knowledge(knowledge_id: str):
     graph = get_graph()

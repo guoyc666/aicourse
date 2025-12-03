@@ -55,7 +55,7 @@ def get_all_students_daily_records(
         events = sorted(events, key=lambda r: r.timestamp)
         result[student_id] = []
         for idx, r in enumerate(events, start=1):
-            resource = db.query(FileResource).filter(FileResource.id == r.resource_id).first()
+            resource = db.query(FileResource).filter(FileResource.file_id == r.resource_id).first()
             resource_name = resource.title if resource else "未知资源"
             dt = r.timestamp
             time_str = dt.strftime("%H:%M:%S")
@@ -80,7 +80,7 @@ def get_daily_records(
     records = sorted(records, key=lambda r: r.timestamp)
     result = []
     for idx, r in enumerate(records, start=1):
-        resource = db.query(FileResource).filter(FileResource.id == r.resource_id).first()
+        resource = db.query(FileResource).filter(FileResource.file_id == r.resource_id).first()
         resource_name = resource.title if resource else "未知资源"
         dt = r.timestamp
         time_str = dt.strftime("%H:%M:%S")

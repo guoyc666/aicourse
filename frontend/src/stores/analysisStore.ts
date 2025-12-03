@@ -11,6 +11,7 @@ interface AnalysisState {
   progressRecords: Record<string, number>; // knowledgeId -> progress
 
   calendarDurationRecords: [string, number][]; // [日期, 时长]
+  selectedStudent: number | null;
   selectedDay: string | null;
   selectedDayRecords: DailyEvent[]; // 存储所选日期的学习记录详情
 
@@ -24,6 +25,7 @@ export const useAnalysisStore = defineStore("Analysis", {
     progressRecords: {},
 
     calendarDurationRecords: [],
+    selectedStudent: null,
     selectedDay: null,
     selectedDayRecords: [],
 

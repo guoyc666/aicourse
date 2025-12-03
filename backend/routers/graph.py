@@ -67,7 +67,7 @@ def get_all_nodes(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    nodes= get_all_knowledge_nodes()   
+    nodes= get_all_knowledge_nodes(db)   
     return nodes
 
 @router.post("/node")

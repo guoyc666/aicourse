@@ -6,7 +6,7 @@
       </el-select>
       <el-select
         v-if="!isStudent"
-        v-model="selectedStudent"
+        v-model="analysisStore.selectedStudent"
         style="width: 120px; margin-left: 16px;"
         placeholder="选择学生"
       >
@@ -40,7 +40,6 @@ import { useUserStore } from "../../stores/user";
 const userStore = useUserStore();
 const isStudent = userStore.hasRole("student");
 const students = ref<{ id: number; name: string }[]>([]);
-const selectedStudent = ref<number>(1);
 
 const chartRef = ref<HTMLDivElement | null>(null);
 let myChart: echarts.ECharts | null = null;
@@ -109,26 +108,28 @@ const option = {
 
 onMounted(async () => {
   if (isStudent) {
-    selectedStudent.value = userStore.user.id;
+    analysisStore.selectedStudent = userStore.user.id;
   } else {
     const res = await getStudents();
     //console.log('获取学生列表:', res);
     students.value = res;
     // 默认选第一个学生
     if (students.value.length > 0) {
-      selectedStudent.value = students.value[0]!.id;
+      analysisStore.selectedStudent = students.value[0]!.id;
     }
   }
 
-  await analysisStore.fetchCalendarDurations(calendarYear.value, selectedStudent.value);
+  await analysisStore.fetchCalendarDurations(calendarYear.value, analysisStore.selectedStudent!);
   if (!chartRef.value) return;
   myChart = echarts.init(chartRef.value);
   myChart.setOption(option);
 
   // 监听年份和学生变化
-  watch([calendarYear, selectedStudent], async ([newYear, newStudent]) => {
-    option.calendar.range = newYear;
-    await analysisStore.fetchCalendarDurations(newYear, newStudent);
+  watch([calendarYear, analysisStore.selectedStudent], async ([newYear, newStudent]) => {
+    const year = Number((newYear as any)?.value ?? newYear ?? 0);
+    const student = Number((newStudent as any)?.value ?? newStudent ?? 0);
+    option.calendar.range = year;
+    await analysisStore.fetchCalendarDurations(year, student);
     option.series.data = analysisStore.calendarDurationRecords;
     if (myChart) myChart.setOption(option, true);
   }, { immediate: true });

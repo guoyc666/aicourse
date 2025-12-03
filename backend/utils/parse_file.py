@@ -19,6 +19,7 @@ def analyse_file(filename, filepath, fileid, download_url, file_type, is_sync=Fa
                 id=fileid,
                 name=filename,
                 type=file_type,
+                download_url=download_url,
                 content=text
             )
         chunks = chunk_text(text)

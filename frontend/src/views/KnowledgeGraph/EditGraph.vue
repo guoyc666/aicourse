@@ -128,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, computed, watch } from "vue";
+import { ref, nextTick, computed } from "vue";
 import cytoscape from "cytoscape";
 import type { CytoscapeElements, CytoscapeNode } from '../../types';
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -142,7 +142,8 @@ const props = defineProps<{
   cy: cytoscape.Core;
   expandToNode: (targetId: string) => void;
   collapseNode: (targetId: string) => void;
-  selectNode: (node: cytoscape.NodeSingular) => void;
+  selectNode: (nodeID: string) => void;
+  removeNode: (nodeID: string) => void;
 }>()
 const emit = defineEmits(['update:elements'])
 
@@ -240,28 +241,21 @@ const preNodeList = computed(() => {
     }));
 });
 
-const filteredPrerequisiteNodes = ref<Record<string, string>>({});
-
-watch(
-  () => editForm.value.parentId,
-  (newParentId) => {
-    const ancestorIds = collectAncestorIds(newParentId, props.elements.edges);
-
-    const excludeIds = new Set([
-      ...ancestorIds,
-      newParentId,
-    ]);
-
-    const result: Record<string, string> = {};
-    for (const [id, name] of Object.entries(editForm.value.prerequisiteNodes)) {
-      if (!excludeIds.has(id)) {
-        result[id] = name;
-      }
+const filteredPrerequisiteNodes = computed(() => {
+  const newParentId = editForm.value.parentId;
+  const ancestorIds = collectAncestorIds(newParentId, props.elements.edges);
+  const excludeIds = new Set([
+    ...ancestorIds,
+    newParentId,
+  ]);
+  const result: Record<string, string> = {};
+  for (const [id, name] of Object.entries(editForm.value.prerequisiteNodes)) {
+    if (!excludeIds.has(id)) {
+      result[id] = name;
     }
-    filteredPrerequisiteNodes.value = result;
-  },
-  { immediate: true }
-);
+  }
+  return result;
+});
 
 const resNodeList = computed(() => {
   return graphStore.resources.map((r) => ({
@@ -287,7 +281,7 @@ function addChildNode() {
   addChildDescription.value = "";
   showAddChildDialog.value = true;
 }
-function startEditChildNode() {
+async function startEditChildNode() {
   if (!graphStore.selectedNodeID) {
     ElMessage.error("未选中父节点，无法添加子节点");
     return;
@@ -298,7 +292,7 @@ function startEditChildNode() {
   }
   // 添加新节点
   const parentId = graphStore.selectedNodeID;
-  const parentNode = props.cy.getElementById(parentId);
+  const parentNode = props.elements.nodes.find(n => n.data.id === parentId);
   const newNodeId = `node_${Date.now()}`;
   const newNodeData: CytoscapeNode = {
     data: {
@@ -306,7 +300,7 @@ function startEditChildNode() {
       name: addChildName.value,
       description: addChildDescription.value,
       category: "Concept",
-      depth: parentNode.data("depth") + 1,
+      depth: parentNode!.data.depth + 1,
       expanded: true,
       img: "",
     },
@@ -322,12 +316,13 @@ function startEditChildNode() {
   
   props.collapseNode(parentId);
   props.expandToNode(parentId);
+
   // 关闭添加子节点弹窗
   showAddChildDialog.value = false;
   emit('update:elements', props.elements);
 
   ElMessage.success("创建成功！请编辑新节点信息");
-  props.selectNode(props.cy.getElementById(newNodeId));
+  props.selectNode(newNodeId);
 
   // 打开编辑弹窗
   startEdit();
@@ -351,12 +346,14 @@ function startEdit() {
     ElMessage.warning("请先选中节点");
     return;
   }
-  const selectedNode = props.cy.getElementById(graphStore.selectedNodeID!);
+  const selectedNode = props.elements.nodes.find(
+    (n) => n.data.id === graphStore.selectedNodeID
+  );  
   if (!selectedNode) {
     ElMessage.warning("请先选中节点");
     return;
   }
-  if (selectedNode.data("category") === "Course") {
+  if (selectedNode.data.category === "Course") {
     ElMessage.warning("课程节点不可编辑");
     return;
   }
@@ -364,18 +361,18 @@ function startEdit() {
   clearEditForm();
 
   // 名称和描述
-  editForm.value.name = selectedNode.data("name");
-  editForm.value.description = selectedNode.data("description");
+  editForm.value.name = selectedNode.data.name;
+  editForm.value.description = selectedNode.data.description || "";
 
   // 父节点
-  updateParentNodeList(selectedNode.id());
+  updateParentNodeList(selectedNode.data.id);
   editForm.value.parentId = props.elements.edges.find(
-    (l) => l.data.target === selectedNode.id() && l.data.relation === "包含"
+    (l) => l.data.target === selectedNode.data.id && l.data.relation === "包含"
   )?.data.source || "";
 
   // 前置节点
   const preLinks = props.elements.edges.filter(
-    (l) => l.data.target === selectedNode.id() && l.data.relation === "前置"
+    (l) => l.data.target === selectedNode.data.id && l.data.relation === "前置"
   );
   preLinks.forEach((l) => {
     const preNode = props.elements.nodes.find(
@@ -388,7 +385,7 @@ function startEdit() {
 
   // 关联资源
   const resLinks = props.elements.edges.filter(
-    (l) => l.data.source === selectedNode.id() && l.data.relation === "关联"
+    (l) => l.data.source === selectedNode.data.id && l.data.relation === "关联"
   );
   resLinks.forEach((l) => {
     const resNode = graphStore.resources.find(
@@ -561,7 +558,7 @@ async function saveNodeEdits() {
 
   ElMessage.success("修改成功");
   await nextTick();
-  props.selectNode(selectedNode);
+  props.selectNode(graphStore.selectedNodeID!);
   await nextTick();
 };
 
@@ -583,6 +580,10 @@ function deleteNode() {
       const nodeId = graphStore.selectedNodeID!;
       const childIds = collectChildIds(nodeId, props.elements.edges);
       const idsToDelete = [nodeId, ...childIds];
+      // 在 cytoscape 实例中删除节点和相关边
+      idsToDelete.forEach((id) => {
+        props.removeNode(id);
+      });
       // 从元素中删除节点和相关边 
       props.elements.nodes = props.elements.nodes.filter(
         (n) => !idsToDelete.includes(n.data.id)
@@ -592,16 +593,6 @@ function deleteNode() {
           !idsToDelete.includes(e.data.source) &&
           !idsToDelete.includes(e.data.target)
       );
-      // 在 cytoscape 实例中删除节点和相关边
-      idsToDelete.forEach((id) => {
-        const cyNode = props.cy.getElementById(id);
-        if (cyNode.length) {
-          props.cy.remove(cyNode);
-        }
-      });
-
-      // 取消选中状态
-      graphStore.unSelectNode();
       emit('update:elements', props.elements);
 
       ElMessage.success("删除成功");

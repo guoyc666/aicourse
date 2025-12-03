@@ -120,7 +120,7 @@ def calc_mastery(student_id: str, db: Session):
                     'question_id': qid,
                     'correct': is_correct,
                     'submit_time': rec.submit_time,
-                    'time': rec.duration/q['total_questions']  # 平均每题用时
+                    'time': rec.duration/rec.total_questions  # 平均每题用时
                 }
     
     # 获取知识点列表
@@ -128,7 +128,7 @@ def calc_mastery(student_id: str, db: Session):
 
     # 获取题库
     # question: [{'question_id', 'type', 'difficulty', 'knowledge_id'}]
-    # 其中knowledge_id为JSON格式的知识点ID列表
+    # 其中knowledge_id为JSON格式的知识点ID列表，例如["bd_definition_1764597341539", "data_types_1764597341539", "base_concept"]
     # 对于all_knowledge_points中的每个知识点，在all_questions中找到相关题目列表，从record_map中找到对应的答题记录，计算加权正确率和平均答题速度
     all_questions = db.query(Question).all()
     mastery_results = {}

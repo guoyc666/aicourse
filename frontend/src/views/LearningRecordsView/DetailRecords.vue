@@ -24,6 +24,7 @@ import { ScatterChart } from "echarts/charts";
 import { TooltipComponent, GridComponent } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
 import type { DailyEvent } from "../../types";
+
 echarts.use([ScatterChart, TooltipComponent, GridComponent, CanvasRenderer]);
 
 const chartRef = ref<HTMLDivElement | null>(null);
@@ -84,7 +85,7 @@ const option = {
 // 监听 selectedDay，每次变化都刷新数据
 watch(() => analysisStore.selectedDay, async (newDay) => {
   if (newDay) {
-    await analysisStore.fetchSelectedDayRecords(1); // 1为studentId，可根据实际传参
+    await analysisStore.fetchSelectedDayRecords(analysisStore.selectedStudent??1);
     if (myChart) {
       myChart.setOption({
         series: [{

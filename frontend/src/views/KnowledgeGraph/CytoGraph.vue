@@ -1,6 +1,13 @@
 <template>
   <CreateCourse />
-  <EditGraph v-model:elements="elements" :cy="cy" :expandToNode="expandToNode" :collapseNode="collapseNode" :selectNode="selectNode" />
+  <EditGraph
+   v-model:elements="elements"
+   :cy="cy"
+   :expandToNode="expandToNode"
+   :collapseNode="collapseNode"
+   :selectNode="selectNode"
+   :removeNode="removeNode"
+  />
   <div ref="cyRef" class="graph-canvas"></div>
   <!-- 搜索框 -->
   <div class="search-box">
@@ -129,8 +136,9 @@ function calcElements(layoutMode: string = "all") {
   };
 }
 
-async function selectNode(node: cytoscape.NodeSingular) {
+async function selectNode(nodeID: string) {
   if (!cy) return;
+  const node = cy.getElementById(nodeID);
   //console.log("选中节点：", node.data());
   await graphStore.selectNode(node.id());
   // 清空之前的选中状态
@@ -188,13 +196,17 @@ function expandNode(parentId: string) {
     if (!cy.getElementById(id).length) {
       const node = elements.value.nodes.find((n) => n.data.id === id);
       if (node) {
-        cy.add({
+        const addedNode = cy.add({
           data: {
             ...node.data,
             expanded: false,
           },
           position: childPositions[idx],
         });
+        // 如果是学习情况模式，给新节点加上样式
+        if (studyStatusMode.value) {
+          addedNode.addClass("study_status_view");
+        }
       }
     }
   });
@@ -360,8 +372,7 @@ async function handleSearchSelect(item: { value: string }) {
   const node = elements.value.nodes.find((n) => n.data.name === item.value)?.data;
   if (!node) return;
   expandToNode(node.id);
-  const cyNode = cy.getElementById(node.id);
-  selectNode(cyNode);
+  selectNode(node.id);
 }
 
 // 递归展开到目标节点
@@ -398,6 +409,119 @@ function expandToNode(targetId: string) {
   }
 }
 
+// 递归更新 depth
+function updateDepths(nodeId: string, parentDepth: number) {
+  // 当前节点
+  const node = elements.value.nodes.find(n => n.data.id === nodeId);
+  if (node) {
+    node.data.depth = parentDepth + 1;
+    cy.getElementById(nodeId).data('depth', parentDepth + 1);
+  }
+
+  // 所有子节点
+  elements.value.edges
+    .filter(e => e.data.source === nodeId && e.data.relation === "包含")
+    .forEach(e => {
+      updateDepths(e.data.target, parentDepth + 1);
+    });
+}
+
+async function saveNodeEdits(editForm: any, filteredPrerequisiteNodes: any) {
+  const selectedNode = cy.getElementById(graphStore.selectedNodeID!);
+  const nodeId = selectedNode.id();
+
+  // 更新 depth 字段
+  const parentNode = elements.value.nodes.find(n => n.data.id === editForm.parentId);
+  if (!parentNode) {
+    ElMessage.error("父节点不存在，无法修改");
+    return;
+  }
+  const parentDepth = parentNode.data.depth ?? 0;
+  updateDepths(nodeId, parentDepth);
+
+  // 修改节点基本信息，从 elements 中找到对应节点并修改，然后修改 cy 中对应节点的数据
+  const node = elements.value.nodes.find((n) => n.data.id === nodeId);
+  if (node) {
+    node.data.name = editForm.name;
+    node.data.description = editForm.description;
+    selectedNode.data("name", editForm.name);
+    selectedNode.data("description", editForm.description);
+  }
+
+  // 父节点关系（只允许一个父节点，“包含”关系）
+  expandToNode(editForm.parentId);
+  // 先移除原有父节点的“包含”边
+  elements.value.edges = elements.value.edges.filter(
+    (l) =>
+      !(
+        l.data.target === nodeId &&
+        l.data.relation === "包含"
+      )
+  );
+  cy.edges().filter(e => e.data('target') === nodeId && e.data('relation') === '包含').remove();
+
+  // 添加新的父节点边
+  const parentEdgeData = {
+    source: editForm.parentId,
+    target: nodeId,
+    relation: "包含",
+  };
+  elements.value.edges.push({ data: parentEdgeData });
+  cy.add({ group: 'edges', data: parentEdgeData });
+
+  // 前置节点关系（全部替换为当前表单中的前置节点，“前置”关系）
+  // 先移除原有的前置边
+  elements.value.edges = elements.value.edges.filter(
+    (l) =>
+      !(
+        l.data.target === nodeId &&
+        l.data.relation === "前置"
+      )
+  );
+  cy.edges().filter(
+    e =>e.data('target') === nodeId && e.data('relation') === '前置'
+  ).remove();
+  // 添加新的前置边
+  for (const preId of Object.keys(filteredPrerequisiteNodes)) {
+    const preEdgeData = {
+      source: preId,
+      target: nodeId,
+      relation: "前置",
+    };
+    elements.value.edges.push({ data: preEdgeData });
+    if (cy.getElementById(preId).length) cy.add({ group: 'edges', data: preEdgeData });
+  }
+
+  // 关联资源关系（全部替换为当前表单中的资源，“关联”关系）
+  // 先移除原有的关联边
+  elements.value.edges = elements.value.edges.filter(
+    (l) =>
+      !(
+        l.data.source === nodeId &&
+        l.data.relation === "关联"
+      )
+  );
+  // 添加新的关联边
+  for (const resId of Object.keys(editForm.resourceNodes)) {
+    elements.value.edges.push({
+      data: {
+        source: nodeId,
+        target: resId,
+        relation: "关联",
+      },
+    });
+  };
+};
+
+function removeNode(nodeID: string) {
+  if (!cy) return;
+  const cyNode = cy.getElementById(nodeID);
+  if (cyNode.length) {
+    unselectNode();
+    cy.remove(cyNode);
+  }
+}
+
 function renderCytoscape() {
   if (!cyRef.value) return;
   // 初始化 Cytoscape
@@ -414,11 +538,12 @@ function renderCytoscape() {
   cy.on("tap", "node", async (evt) => {
     // 选中节点
     const nodeData = evt.target.data();
+    //console.log("点击节点：", nodeData);
 
     // 如果当前选中节点不是它，直接选中并展开
     if ( graphStore.selectedNodeID !== nodeData.id) {
       expandNode(nodeData.id);
-      selectNode(evt.target);
+      selectNode(nodeData.id);
       //await nextTick();
       return;
     }

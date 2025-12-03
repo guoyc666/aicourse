@@ -46,6 +46,7 @@ class GraphDataOut(GraphData):
 class KnowledgeInfo(BaseModel):
     id: str
     name: str
+    question_count: int
 
 class ResourceInfo(BaseModel):
     id: str

@@ -187,10 +187,10 @@ def getAnswer(course_prompt, CONTENT: str):
     )
     return response.choices[0].message.content
 
-def addResourseToGraph(id: str, name: str, type: str, download_url: str, CONTENT: str):
+def addResourseToGraph(id: str, name: str, type: str, download_url: str, content: str):
     knowledge_graph = load_knowledge_graph(kg_path)
     prompt = build_course_prompt(knowledge_graph)
-    result_str = getAnswer(prompt, CONTENT)
+    result_str = getAnswer(prompt, content)
     result = json.loads(result_str)
     new_nodes, new_edges = filter_nodes_and_edges(result['nodes'], result['edges'])
 
@@ -226,6 +226,7 @@ def addResourseToGraph(id: str, name: str, type: str, download_url: str, CONTENT
         "id": id,
         "name": name,
         "category": "Resource",
+        "download_url": download_url,
         "type": type
     }
     final_nodes.append(resource_node)
