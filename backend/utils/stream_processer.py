@@ -14,7 +14,8 @@ def get_docs(query: str, top_K1=10, top_K2=3) -> List[str]:
     docs = results["documents"][0]
     metas = results["metadatas"][0]
     ids = results["ids"][0]
-
+    if not docs:
+        return []
     _results = get_rerank(query, docs)[:top_K2]
     results = []
     for result in _results:

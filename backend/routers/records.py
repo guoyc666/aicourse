@@ -248,4 +248,4 @@ def get_complete_count(
     if not check_role(db, current_user.id, "student"):
         raise HTTPException(status_code=403, detail="Not authorized")
     result = get_completed_knowledge_count(db, current_user.id)
-    return result
+    return {"complete_count": result}

@@ -22,9 +22,8 @@ app = FastAPI(
 # CORS中间件配置
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 允许所有来源访问API，生产环境中请根据需要进行限制
-    # allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:80", 
-    # "http://frontend:80", "http://frontend:3000"],  # Vue开发服务器和备用端口
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:80", 
+    "http://frontend:80", "http://frontend:3000"],  # Vue开发服务器和备用端口
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

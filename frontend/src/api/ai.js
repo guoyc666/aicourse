@@ -18,7 +18,7 @@ export const renameConversation = (conversationId, data) => {
 
 export const getChatResponse = (convId, content) => {
   return fetch(
-      `http://localhost:8000/api/ai/conversations/${convId}/messages`,
+      `/api/ai/conversations/${convId}/messages`,
       {
         method: "POST",
         headers: {

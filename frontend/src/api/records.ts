@@ -20,6 +20,6 @@ export const recordsAPI = {
   },
   async getCompleteCount() {
     const res = await api.get(`/api/complete_count`);
-    return res.data.count; // 假设返回的数据格式为 { count: number }
+    return res.complete_count; // 假设返回的数据格式为 { complete_count: number }
   },
 };
