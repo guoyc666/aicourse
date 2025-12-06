@@ -6,7 +6,7 @@ from datetime import timedelta
 from database import get_db
 from models import User, Role
 from schemas import UserCreate, UserLogin, UserResponse, Token
-from auth import (
+from utils.auth import (
     authenticate_user, create_access_token, get_current_active_user,
     get_password_hash, get_user_roles, ACCESS_TOKEN_EXPIRE_MINUTES
 )

@@ -1,10 +1,10 @@
 from fastapi import APIRouter
 from fastapi import Depends
-from auth import get_current_active_user, verify_permission, check_role
+from utils.auth import get_current_active_user, verify_permission, check_role
 from models import User
 from database import get_db
 from sqlalchemy.orm import Session
-from schemas_.graph import GraphDataOut, GraphNode, GraphEdge, GraphData, KnowledgeInfo, NodeDetail
+from schemas.graph import GraphDataOut, GraphNode, GraphEdge, GraphData, KnowledgeInfo, NodeDetail
 from crud.graph import (
     batch_add_nodes_and_edges, delete_all_nodes_and_edges, get_all_knowledge_nodes, get_all_nodes_and_edges,get_node_detail,
     create_node,

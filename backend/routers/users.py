@@ -8,7 +8,7 @@ from schemas import (
     UserResponse, UserUpdate, RoleResponse, RoleCreate, RoleUpdate,
     PermissionResponse
 )
-from auth import (
+from utils.auth import (
     get_current_active_user, verify_permission, verify_role,
     get_password_hash, get_user_roles
 )

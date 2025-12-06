@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from auth import get_current_active_user, check_role
+from utils.auth import get_current_active_user, check_role
 from models import User
 from database import get_db
-from schemas_.mastery import MasteryListOut, MasteryOut, AverageMasteryOut
+from schemas.mastery import MasteryListOut, MasteryOut, AverageMasteryOut
 from crud.mastery import (
     get_average_mastery,
     list_average_mastery,

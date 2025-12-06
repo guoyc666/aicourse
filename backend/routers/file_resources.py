@@ -12,7 +12,7 @@ from typing import Optional
 from crud.records import delete_learning_records_by_resource
 from database import get_db
 from models import FileResource, User
-from auth import get_current_user
+from utils.auth import get_current_user
 from schemas import FileResourceResponse
 from config import config  # 导入配置对象
 

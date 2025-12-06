@@ -1,17 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
-import uvicorn
-from datetime import datetime, timedelta
-from typing import List, Optional
 import os
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+from datetime import datetime
 from dotenv import load_dotenv
 
-from database import get_db, engine, Base
-from models import User, Role, Permission
-from auth import authenticate_user, create_access_token, get_current_user, verify_permission
-from schemas import UserCreate, UserLogin, UserResponse, Token, RoleResponse, TopicResponse, ReplyResponse
+from database import engine, Base
 from routers import auth, users, tasks, topics, ai_assistant, graph, records, progress, mastery, question, file_resources
 
 load_dotenv()
@@ -20,8 +15,8 @@ load_dotenv()
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="AI辅助学习系统",
-    version="1.0.0"
+    title=os.getenv("APP_NAME", "AI辅助学习系统"),
+    version=os.getenv("APP_VERSION", "1.0.0")
 )
 
 # CORS中间件配置
@@ -41,7 +36,7 @@ app.include_router(users.router, prefix="/api/users", tags=["用户管理"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["任务管理"])
 app.include_router(topics.router, prefix="/api/topics", tags=["讨论区"])
 app.include_router(file_resources.router, prefix="/api", tags=["文件资源"])
-app.include_router(question.router, prefix="", tags=["题库"])  # 注意：question内部已包含/api前缀
+app.include_router(question.router, prefix="/api/question", tags=["题库"])
 app.include_router(ai_assistant.router, prefix="/api/ai", tags=["AI助手"])
 app.include_router(graph.router, prefix="/api", tags=["知识图谱"])
 app.include_router(records.router, prefix="/api", tags=["学习记录"])

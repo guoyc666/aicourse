@@ -196,19 +196,18 @@ const loadPendingTasks = async () => {
 const loadDashboardData = async () => {
   try {
     // 获取学习统计数据
-    const statsResponse = await getLearningStats();
-    
-    if (statsResponse.data.code === 200 && statsResponse.data.data) {
-      const learningData = statsResponse.data.data;
-      // 注意：这里的字段映射需要根据实际返回的数据结构调整
-      stats.learningNodes = await recordsAPI.getCompleteCount();
-      stats.questionsAnswered = learningData.answeredQuestions || 0;
-      stats.accuracy = learningData.accuracy || 0;
-      stats.learningTime = 0; // 暂未从API获取
-    }
-    
-    // 加载未完成任务
     if (userStore.hasRole('student')) {
+      const statsResponse = await getLearningStats();
+
+      if (statsResponse.data.code === 200 && statsResponse.data.data) {
+        const learningData = statsResponse.data.data;
+        // 注意：这里的字段映射需要根据实际返回的数据结构调整
+        stats.learningNodes = await recordsAPI.getCompleteCount();
+        stats.questionsAnswered = learningData.answeredQuestions || 0;
+        stats.accuracy = learningData.accuracy || 0;
+        stats.learningTime = 0; // 暂未从API获取
+      }
+      // 加载未完成任务
       await loadPendingTasks()
     }
   } catch (error) {

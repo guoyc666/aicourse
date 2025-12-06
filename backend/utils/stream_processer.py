@@ -3,7 +3,7 @@ import os
 from typing import List
 from sqlalchemy.orm import Session
 from .ai_client import client, chat_once, get_rerank
-import models_.ai_assistant as models
+import models.ai_assistant as models
 from .chroma_manager import VectorStore
 
 

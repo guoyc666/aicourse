@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-import schemas_.ai_assistant as schemas
-import models_.ai_assistant as models
+import schemas.ai_assistant as schemas
+import models.ai_assistant as models
 from models import User as UserModel
 from database import get_db
-from auth import get_current_user
+from utils.auth import get_current_user
 from utils.ai_client import chat_once
 from utils.stream_processer import StreamProcessor
 

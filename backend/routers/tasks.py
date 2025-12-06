@@ -10,7 +10,7 @@ from schemas import (
     TaskSubmissionCreate, TaskSubmissionResponse,
     AssignedTaskResponse
 )
-from auth import get_current_active_user, verify_permission, verify_role
+from utils.auth import get_current_active_user, verify_permission, verify_role
 
 router = APIRouter()
 

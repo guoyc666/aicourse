@@ -5,7 +5,7 @@
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 from models import Base, Role, Permission, RolePermission, User, UserRole, Task, AssignedTask, TaskSubmission, Topic, Reply
-from auth import get_password_hash
+from utils.auth import get_password_hash
 
 def create_tables():
     """创建数据库表"""

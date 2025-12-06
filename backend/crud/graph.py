@@ -2,7 +2,7 @@ import json
 from typing import List, Dict, Any
 from py2neo import Node, Relationship
 from neo4j import get_graph
-from schemas_.graph import KnowledgeInfo
+from schemas.graph import KnowledgeInfo
 from models import Question, LearningRecord
 from sqlalchemy.orm import Session
 

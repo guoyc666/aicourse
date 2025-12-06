@@ -10,13 +10,10 @@ from pydantic import BaseModel
 
 from database import get_db
 from models import Question, LearningRecord, QuestionRecord, User, QuestionType, CodeLanguage
-from auth import get_current_user, get_current_active_user, check_role
+from utils.auth import get_current_user, get_current_active_user, check_role
 
 # 创建路由对象
-router = APIRouter(
-    prefix="/api/question",
-    tags=["题库"]
-)
+router = APIRouter()
 
 # 代码执行辅助类
 class CodeExecutor:

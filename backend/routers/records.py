@@ -2,9 +2,9 @@ import math
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
-from auth import get_current_active_user,verify_permission, check_role
+from utils.auth import get_current_active_user, get_current_user,verify_permission, check_role
 from models import FileResource, User
-from schemas_.records import AverageStudyTimeOut, LearningRecordCreate, StudyTimeOut, StudyTimeListOut
+from schemas.records import AverageStudyTimeOut, LearningRecordCreate, StudyTimeOut, StudyTimeListOut
 from datetime import datetime, date, timedelta
 from crud.records import (
     create_learning_record,
@@ -23,6 +23,7 @@ from crud.records import (
     list_study_time_list,
     get_average_study_time,
     list_average_study_time,
+    get_completed_knowledge_count
 )
 
 router = APIRouter()
@@ -241,7 +242,7 @@ def list_average_study_time_all(
 
 @router.get("/complete_count")
 def get_complete_count(
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     if not check_role(db, current_user.id, "student"):

@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from neo4j import get_graph
-from auth import get_current_active_user,verify_permission, check_role
+from utils.auth import get_current_active_user,verify_permission, check_role
 from models import User
 from database import get_db
 from sqlalchemy.orm import Session
-from schemas_.progress import ProgressOut, ProgressListOut, AverageProgressOut
+from schemas.progress import ProgressOut, ProgressListOut, AverageProgressOut
 from crud.progress import (
     get_progress,
     list_progress,

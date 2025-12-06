@@ -6,7 +6,7 @@ from datetime import datetime
 from database import get_db
 from models import Topic as TopicModel, Reply as ReplyModel, User as UserModel
 from schemas import TopicBase, TopicCreate, TopicUpdate, TopicResponse, ReplyBase, ReplyCreate, ReplyResponse
-from auth import get_current_user
+from utils.auth import get_current_user
 from fastapi import APIRouter, status, HTTPException, Depends
 from fastapi.routing import APIRoute
 
