@@ -238,3 +238,13 @@ def list_average_study_time_all(
 ):
     result = list_average_study_time(db)
     return result
+
+@router.get("/complete_count")
+def get_complete_count(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    if not check_role(db, current_user.id, "student"):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    result = get_completed_knowledge_count(db, current_user.id)
+    return result

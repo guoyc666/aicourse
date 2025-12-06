@@ -192,6 +192,7 @@ def addResourseToGraph(id: str, name: str, type: str, download_url: str, content
     prompt = build_course_prompt(knowledge_graph)
     result_str = getAnswer(prompt, content)
     result = json.loads(result_str)
+    # 过滤和验证新节点及边
     new_nodes, new_edges = filter_nodes_and_edges(result['nodes'], result['edges'])
 
     # 构建旧图的包含关系邻接表

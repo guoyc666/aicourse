@@ -224,12 +224,16 @@ const onSubmit = async (value: string) => {
             const data = JSON.parse(dataStr);
             const begin = data.begin ?? false;
             const done = data.done ?? false;
+            console.log("Received data chunk:", data);
             if (begin) {
               const conv_id = data.conv_id ?? null;
               continue;
             }
             if (done) {
               ai_message.rag_docs = data.rag_docs ?? [];
+              console.log("AI message completed:", ai_message);
+              console.log("RAG Docs:", ai_message.rag_docs);
+              key.value = !key.value;
               continue;
             }
             ai_message.content += data.content ?? "";

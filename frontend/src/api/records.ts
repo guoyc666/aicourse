@@ -18,4 +18,8 @@ export const recordsAPI = {
     const res = await api.post(`/api/records/`, record);
     return res; // 应返回添加成功的记录
   },
+  async getCompleteCount() {
+    const res = await api.get(`/api/complete_count`);
+    return res.data.count; // 假设返回的数据格式为 { count: number }
+  },
 };

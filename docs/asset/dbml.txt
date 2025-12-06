@@ -1,0 +1,122 @@
+// 用户系统
+Table users {
+  id int [pk, increment]
+  name varchar
+  email varchar
+  created_at timestamp
+}
+
+Table roles {
+  id int [pk, increment]
+  name varchar [unique]
+  description text
+}
+
+Table user_roles {
+  user_id int [ref: > users.id, pk]
+  role_id int [ref: > roles.id, pk]
+}
+
+Table permissions {
+  id int [pk, increment]
+  name varchar [unique]
+  description text
+}
+
+Table role_permissions {
+  role_id int [ref: > roles.id, pk]
+  permission_id int [ref: > permissions.id, pk]
+}
+
+// 任务系统
+Table tasks {
+  id int [pk, increment]
+  creator_id int [ref: > users.id]
+  title varchar
+  description text
+  due_date timestamp
+  created_at timestamp
+}
+
+Table assigned_tasks {
+  id int [pk, increment]
+  task_id int [ref: > tasks.id]
+  student_id int [ref: > users.id]
+}
+
+Table task_submissions {
+  id int [pk, increment]
+  task_id int [ref: > tasks.id]
+  student_id int [ref: > users.id]
+  submission_data text
+  submitted_at timestamp
+}
+
+// 讨论区
+Table topics {
+  id int [pk, increment]
+  title varchar
+  content text
+  author_id int [ref: > users.id]
+  created_at timestamp
+}
+
+Table replies {
+  id int [pk, increment]
+  topic_id int [ref: > topics.id]
+  author_id int [ref: > users.id]
+  content text
+  created_at timestamp
+}
+
+// 资源管理
+Table file_resources {
+  id int [pk, increment]
+  uploaded_by_user_id int [ref: > users.id]
+  file_path varchar
+  file_name varchar
+  mime_type varchar
+  uploaded_at timestamp
+}
+
+// 题库与知识点
+Table questions {
+  id int [pk, increment]
+  question_text text
+  difficulty_level varchar
+}
+
+Table knowledge_points {
+  id int [pk, increment]
+  name varchar
+  description text
+}
+
+Table knowledge_resource_links {
+  knowledge_point_id int [ref: > knowledge_points.id, pk]
+  resource_id int [ref: > file_resources.id, pk]
+}
+
+// 掌握度记录（Student = User）
+Table mastery {
+  student_id int [ref: > users.id, pk]
+  knowledge_id int [ref: > knowledge_points.id, pk]
+  mastery_level int
+  last_practiced_at timestamp
+}
+
+// AI 助手对话
+Table conversations {
+  id int [pk, increment]
+  user_id int [ref: > users.id]
+  title varchar
+  created_at timestamp
+}
+
+Table messages {
+  id int [pk, increment]
+  conversation_id int [ref: > conversations.id]
+  sender varchar
+  content text
+  created_at timestamp
+}

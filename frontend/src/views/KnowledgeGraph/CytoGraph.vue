@@ -6,6 +6,7 @@
    :expandToNode="expandToNode"
    :collapseNode="collapseNode"
    :selectNode="selectNode"
+   :saveNodeEdits="saveNodeEdits"
    :removeNode="removeNode"
   />
   <div ref="cyRef" class="graph-canvas"></div>

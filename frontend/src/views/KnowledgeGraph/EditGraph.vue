@@ -156,6 +156,7 @@ const props = defineProps<{
   expandToNode: (targetId: string) => void;
   collapseNode: (targetId: string) => void;
   selectNode: (nodeID: string) => void;
+  saveNodeEdits: (editForm:any, filteredPrerequisiteNodes:any) => void;
   removeNode: (nodeID: string) => void;
 }>();
 const emit = defineEmits(["update:elements"]);
@@ -498,79 +499,11 @@ async function saveNodeEdits() {
     ElMessage.error("父节点不存在，无法修改");
     return;
   }
-  const parentDepth = parentNode.data.depth ?? 0;
-  updateDepths(nodeId, parentDepth);
 
-  // 修改节点基本信息，从 props.elements 中找到对应节点并修改，然后修改 props.cy 中对应节点的数据
-  const node = props.elements.nodes.find((n) => n.data.id === nodeId);
-  if (node) {
-    node.data.name = editForm.value.name;
-    node.data.description = editForm.value.description;
-    selectedNode.data("name", editForm.value.name);
-    selectedNode.data("description", editForm.value.description);
-  }
-
-  // 父节点关系（只允许一个父节点，“包含”关系）
-  props.expandToNode(editForm.value.parentId);
-  // 先移除原有父节点的“包含”边
-  props.elements.edges = props.elements.edges.filter(
-    (l) => !(l.data.target === nodeId && l.data.relation === "包含")
-  );
-  props.cy
-    .edges()
-    .filter((e) => e.data("target") === nodeId && e.data("relation") === "包含")
-    .remove();
-
-  // 添加新的父节点边
-  const parentEdgeData = {
-    source: editForm.value.parentId,
-    target: nodeId,
-    relation: "包含",
-  };
-  props.elements.edges.push({ data: parentEdgeData });
-  props.cy.add({ group: "edges", data: parentEdgeData });
-
-  // 前置节点关系（全部替换为当前表单中的前置节点，“前置”关系）
-  // 先移除原有的前置边
-  props.elements.edges = props.elements.edges.filter(
-    (l) => !(l.data.target === nodeId && l.data.relation === "前置")
-  );
-  props.cy
-    .edges()
-    .filter((e) => e.data("target") === nodeId && e.data("relation") === "前置")
-    .remove();
-  // 添加新的前置边
-  for (const preId of Object.keys(filteredPrerequisiteNodes.value)) {
-    const preEdgeData = {
-      source: preId,
-      target: nodeId,
-      relation: "前置",
-    };
-    props.elements.edges.push({ data: preEdgeData });
-    if (props.cy.getElementById(preId).length)
-      props.cy.add({ group: "edges", data: preEdgeData });
-  }
-
-  // 关联资源关系（全部替换为当前表单中的资源，“关联”关系）
-  // 先移除原有的关联边
-  props.elements.edges = props.elements.edges.filter(
-    (l) => !(l.data.source === nodeId && l.data.relation === "关联")
-  );
-  // 添加新的关联边
-  for (const resId of Object.keys(editForm.value.resourceNodes)) {
-    props.elements.edges.push({
-      data: {
-        source: nodeId,
-        target: resId,
-        relation: "关联",
-      },
-    });
-  }
-
+  props.saveNodeEdits(editForm.value, filteredPrerequisiteNodes.value);
   // 清空表单并关闭弹窗
   clearEditForm();
   showEditDialog.value = false;
-  emit("update:elements", props.elements);
 
   ElMessage.success("修改成功");
   await nextTick();

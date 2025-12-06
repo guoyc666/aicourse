@@ -190,3 +190,30 @@ def list_average_study_time(db: Session):
         avg_info = get_average_study_time(db, kp_id)
         result.append(avg_info)
     return result
+
+# 获取已经学完的知识点数目
+def get_completed_knowledge_count(db: Session, student_id: int):
+    all_knowledge_points = get_all_knowledge_points()
+    completed_count = 0
+    for kp_id in all_knowledge_points:
+        resource_ids = get_resources_by_knowledge(kp_id)
+        # 如果该知识点没有资源，则不计为已完成（按需可改为计入）
+        if not resource_ids:
+            continue
+
+        # 检查该学生是否对该知识点的每个资源都有 status == 1 的学习记录
+        all_completed = True
+        for res_id in resource_ids:
+            rec = db.query(LearningRecord).filter(
+                LearningRecord.student_id == student_id,
+                LearningRecord.resource_id == res_id,
+                LearningRecord.status == 1
+            ).first()
+            if not rec:
+                all_completed = False
+                break
+
+        if all_completed:
+            completed_count += 1
+
+    return completed_count

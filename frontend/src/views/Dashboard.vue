@@ -141,6 +141,7 @@ import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import { getAssignedTasks } from '@/api/tasks'
 import { getLearningStats } from '@/api/questions'
+import { recordsAPI } from '../api'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -200,7 +201,7 @@ const loadDashboardData = async () => {
     if (statsResponse.data.code === 200 && statsResponse.data.data) {
       const learningData = statsResponse.data.data;
       // 注意：这里的字段映射需要根据实际返回的数据结构调整
-      stats.learningNodes = 0; // 暂未从API获取
+      stats.learningNodes = await recordsAPI.getCompleteCount();
       stats.questionsAnswered = learningData.answeredQuestions || 0;
       stats.accuracy = learningData.accuracy || 0;
       stats.learningTime = 0; // 暂未从API获取
