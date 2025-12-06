@@ -30,7 +30,7 @@ const mockEdges: KnowledgeEdge[] = [
 export const graphAPI = {
   // 获取知识图谱数据
   async fetchKnowledgeGraph() {
-    const res = await api.get("/api/graph");
+    const res = await api.get("/graph");
     return res;
   },
   // 获取模拟知识图谱数据
@@ -42,22 +42,22 @@ export const graphAPI = {
   },
   // 获取节点详情
   async fetchNodeDetail(nodeId: string) {
-    const res = await api.get(`/api/node/detail/${nodeId}`);
+    const res = await api.get(`/node/detail/${nodeId}`);
     return res;
   },
   // 提交知识图谱数据
   async updateKnowledgeGraph(nodes: any[], edges: any[]) {
-    const res = await api.put("/api/graph", { nodes: nodes, edges: edges });
+    const res = await api.put("/graph", { nodes: nodes, edges: edges });
     return res;
   },
   // 创建节点
   async createNode(node: KnowledgeNode) {
-    const res = await api.post("/api/node", node);
+    const res = await api.post("/node", node);
     return res;
   },
   // 获取所有知识点
   async fetchAllKnowledgeNodes() {
-    const res = await api.get("/api/node/knowledge/all");
+    const res = await api.get("/node/knowledge/all");
     return res;
   },
 };

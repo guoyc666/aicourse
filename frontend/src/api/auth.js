@@ -6,31 +6,17 @@ export const login = (data) => {
   formData.append('username', data.username)
   formData.append('password', data.password)
   
-  return request({
-    url: '/api/auth/login',
-    method: 'post',
-    data: formData
-  })
+  return request.post('/auth/login', formData)
 }
 
 export const register = (data) => {
-  return request({
-    url: '/api/auth/register',
-    method: 'post',
-    data
-  })
+  return request.post('/auth/register', data)
 }
 
 export const logout = () => {
-  return request({
-    url: '/api/auth/logout',
-    method: 'post'
-  })
+  return request.post('/auth/logout')
 }
 
 export const getUserInfo = () => {
-  return request({
-    url: '/api/auth/me',
-    method: 'get'
-  })
+  return request.get('/auth/me')
 }

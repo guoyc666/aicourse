@@ -10,11 +10,7 @@ import request from './request'
  * @returns {Promise<Object>} 创建的任务
  */
 export const createTask = (taskData) => {
-  return request({ 
-    url: '/api/tasks/', 
-    method: 'post', 
-    data: taskData 
-  })
+  return request.post('/tasks/', taskData)
 }
 
 /**
@@ -27,11 +23,7 @@ export const createTask = (taskData) => {
  * @returns {Promise<Array>} 任务列表
  */
 export const getTasks = (params = {}) => {
-  return request({ 
-    url: '/api/tasks/', 
-    method: 'get', 
-    params 
-  })
+  return request.get('/tasks/', { params })
 }
 
 /**
@@ -39,10 +31,7 @@ export const getTasks = (params = {}) => {
  * @returns {Promise<Array>} 分配任务列表
  */
 export const getAssignedTasks = () => {
-  return request({ 
-    url: '/api/tasks/assigned/', 
-    method: 'get' 
-  })
+  return request.get('/tasks/assigned/')
 }
 
 /**
@@ -51,10 +40,7 @@ export const getAssignedTasks = () => {
  * @returns {Promise<Object>} 任务详情
  */
 export const getTask = (taskId) => {
-  return request({ 
-    url: `/api/tasks/${taskId}/`, 
-    method: 'get' 
-  })
+  return request.get(`/tasks/${taskId}/`)
 }
 
 /**
@@ -67,11 +53,7 @@ export const getTask = (taskId) => {
  * @returns {Promise<Object>} 更新后的任务
  */
 export const updateTask = (taskId, taskData) => {
-  return request({ 
-    url: `/api/tasks/${taskId}/`, 
-    method: 'put', 
-    data: taskData 
-  })
+  return request.put(`/tasks/${taskId}/`, taskData)
 }
 
 /**
@@ -80,10 +62,7 @@ export const updateTask = (taskId, taskData) => {
  * @returns {Promise<Object>} 删除结果
  */
 export const deleteTask = (taskId) => {
-  return request({ 
-    url: `/api/tasks/${taskId}/`, 
-    method: 'delete' 
-  })
+  return request.delete(`/tasks/${taskId}/`)
 }
 
 /**
@@ -92,10 +71,7 @@ export const deleteTask = (taskId) => {
  * @returns {Promise<Object>} 操作结果
  */
 export const confirmTaskCompleted = (assignedTaskId) => {
-  return request({
-    url: `/api/tasks/assigned/${assignedTaskId}/complete/`,
-    method: 'post'
-  })
+  return request.post(`/tasks/assigned/${assignedTaskId}/complete/`)
 }
 
 /**
@@ -107,9 +83,5 @@ export const confirmTaskCompleted = (assignedTaskId) => {
  * @returns {Promise<Object>} 提交结果
  */
 export const submitTask = (taskId, submissionData) => {
-  return request({
-    url: `/api/tasks/${taskId}/submit/`,
-    method: 'post', 
-    data: submissionData 
-  })
+  return request.post(`/tasks/${taskId}/submit/`, submissionData);
 }

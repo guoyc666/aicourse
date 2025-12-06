@@ -13,7 +13,7 @@ import request from './request'
  * @returns {Promise} 返回添加结果
  */
 export const addQuestion = (data) => {
-  return request.post('/api/question/add', data, {
+  return request.post('/question/add', data, {
     headers: {
       'Content-Type': 'multipart/form-data'
     }
@@ -26,7 +26,7 @@ export const addQuestion = (data) => {
  * @returns {Promise} 返回删除结果
  */
 export const deleteQuestion = (questionId) => {
-  return request.delete('/api/question/delete', {
+  return request.delete('/question/delete', {
     params: { question_id: questionId }
   })
 }
@@ -40,7 +40,7 @@ export const deleteQuestion = (questionId) => {
  * @returns {Promise} 返回题目列表
  */
 export const getQuestionList = (page = 1, pageSize = 20, knowledge_id = null, type = null) => {
-  return request.get('/api/question/list', {
+  return request.get('/question/list', {
     params: {
       skip: (page - 1) * pageSize,
       limit: pageSize,
@@ -56,7 +56,7 @@ export const getQuestionList = (page = 1, pageSize = 20, knowledge_id = null, ty
  * @returns {Promise} 返回题目列表
  */
 export const getPracticeQuestions = (knowledgeId) => {
-  return request.get('/api/question/get', {
+  return request.get('/question/get', {
     params: { knowledge_id: knowledgeId }
   })
 }
@@ -69,7 +69,7 @@ export const getPracticeQuestions = (knowledgeId) => {
  * @returns {Promise} 返回提交结果
  */
 export const submitQuestionAnswer = (data) => {
-  return request.post('/api/question/submit', data)
+  return request.post('/question/submit', data)
 }
 
 /**
@@ -86,7 +86,7 @@ export const getLearningStats = async () => {
     console.log('当前用户ID:', userId);
     
     // 获取练习历史记录，明确传递用户ID参数
-    const historyResponse = await request.get('/api/question/record/list', {
+    const historyResponse = await request.get('/question/record/list', {
       params: { user_id: userId }
     });
     
@@ -115,7 +115,7 @@ export const getLearningStats = async () => {
       console.log('尝试备用方法获取练习记录...');
       try {
         // 尝试使用不同的接口或参数
-        const alternativeResponse = await request.get('/api/question/record/list', {
+        const alternativeResponse = await request.get('/question/record/list', {
           params: { user_id: userId }
         });
         console.log('备用方法响应:', alternativeResponse.data);
@@ -199,7 +199,7 @@ export const getLearningStats = async () => {
     // 获取总题目数
     let totalQuestions = 0;
     try {
-      const questionListResponse = await request.get('/api/question/list', { 
+      const questionListResponse = await request.get('/question/list', { 
         params: { 
           limit: 1, 
           user_id: userId // 传递用户ID
@@ -224,7 +224,7 @@ export const getLearningStats = async () => {
       console.error('获取总题目数失败:', e);
       // 尝试从数据库中直接查询总题目数
       try {
-        const totalResponse = await request.get('/api/question/total');
+        const totalResponse = await request.get('/question/total');
         if (totalResponse.data && totalResponse.data.code === 200 && totalResponse.data.data) {
           totalQuestions = totalResponse.data.data.total || 50;
         } else {
@@ -283,7 +283,7 @@ export const getLearningStats = async () => {
  * @returns {Promise} 返回知识点列表
  */
 export const getKnowledgeNodes = () => {
-  return request.get('/api/question/knowledge/list')
+  return request.get('/question/knowledge/list')
 }
 
 /**
@@ -296,7 +296,7 @@ export const getPracticeHistory = (page = 1, pageSize = 10) => {
   // 从localStorage获取用户信息或使用store中的用户数据
   const userInfo = JSON.parse(localStorage.getItem('userInfo'))
   const userId = userInfo?.id || 1 // 使用真实用户ID，降级使用1
-  return request.get('/api/question/record/list', {
+  return request.get('/question/record/list', {
     params: {
       user_id: userId,
       skip: (page - 1) * pageSize,
@@ -311,7 +311,7 @@ export const getPracticeHistory = (page = 1, pageSize = 10) => {
  * @returns {Promise} 返回练习详情
  */
 export const getPracticeDetail = (recordId) => {
-  return request.get('/api/question/record/detail', {
+  return request.get('/question/record/detail', {
     params: { record_id: recordId }
   })
 }

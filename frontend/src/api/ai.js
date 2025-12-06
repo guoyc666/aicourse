@@ -1,24 +1,24 @@
 import request from "./request";
 
 export const createConversation = (data) => {
-  return request.post("/api/ai/conversations", data);
+  return request.post("/ai/conversations", data);
 };
 
 export const getConversations = () => {
-  return request.get("/api/ai/conversations");
+  return request.get("/ai/conversations");
 }
 
 export const deleteConversation = (conversationId) => {
-  return request.delete(`/api/ai/conversations/${conversationId}`);
+  return request.delete(`/ai/conversations/${conversationId}`);
 }
 
 export const renameConversation = (conversationId, data) => {
-  return request.put(`/api/ai/conversations/${conversationId}`, data);
+  return request.put(`/ai/conversations/${conversationId}`, data);
 }
 
 export const getChatResponse = (convId, content) => {
   return fetch(
-      `/api/ai/conversations/${convId}/messages`,
+      `/ai/conversations/${convId}/messages`,
       {
         method: "POST",
         headers: {
@@ -30,12 +30,6 @@ export const getChatResponse = (convId, content) => {
       }
     );
 }
-
-// export const getChatResponse = (convId, content) => {
-//   return request.post(`/api/ai/conversations/${convId}/messages`, {
-//     user_input: content
-//   });
-// }
 
 /**
  * 
@@ -55,5 +49,5 @@ export const getChatResponse = (convId, content) => {
 ]
  */
 export const getConversationMessages = (conversationId) => {
-  return request.get(`/api/ai/conversations/${conversationId}/messages`);
+  return request.get(`/ai/conversations/${conversationId}/messages`);
 }

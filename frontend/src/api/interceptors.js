@@ -16,6 +16,7 @@ const unregister = fetchIntercept.register({
   request: function (url, config) {
     console.log('请求URL:', url);
     console.log('请求方法:', config?.method || 'GET');
+    const newUrl = '/api' + url; 
 
     // 1. 获取 Token
     const token = Cookies.get('token');
@@ -38,7 +39,7 @@ const unregister = fetchIntercept.register({
       console.log('已添加Authorization头:', `Bearer ${token.substring(0, 10)}...`);
     }
 
-    return [url, newConfig]; // 返回修改后的参数
+    return [newUrl, newConfig]; // 返回修改后的参数
   },
 
   // --- 请求错误拦截 (requestError) ---

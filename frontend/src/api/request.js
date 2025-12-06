@@ -5,7 +5,7 @@ import Cookies from 'js-cookie'
 
 // 创建axios实例
 const request = axios.create({
-  baseURL: '',  // 后端路由已包含/api前缀，这里设为空
+  baseURL: '/api',  // 将/api前缀移到这里，所有接口请求不用再带 /api
   timeout: 10000,
 })
 
