@@ -5,8 +5,10 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - mysql
-      - neo4j
+      mysql:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
     environment:
       - DATABASE_URL=mysql+pymysql://root:root@mysql:3306/aicourse
       - NEO4J_URI=bolt://neo4j:7687
@@ -36,6 +38,12 @@ services:
       - "3306:3306"
     volumes:
       - ./data/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   neo4j:
     image: neo4j:5.13
@@ -48,4 +56,38 @@ services:
       - "7687:7687"
     volumes:
       - ./data/neo4j:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p aicourse 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
+  vllm:
+    build:
+      context: ./vllm
+      dockerfile: Dockerfile
+    container_name: aicourse-vllm
+    restart: unless-stopped
+    gpus: all
+    working_dir: /app
+    volumes:
+    # TOFIX：修改路径
+      - Z:/astudy/aicourse/demo/rag/models/Qwen2.5-7B:/models            # 本地模型目录（包含 base_model）
+      - Z:/astudy/aicourse/demo/rag/models/qwen_ft:/lora_adapter   # 本地 LoRA 适配器目录
+    ports:
+      - "8888:8888"
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: >
+      vllm serve file:///models
+      --served-model-name my_model
+      --lora-modules my_lora=/lora_adapter
+      --port 8888 
+      --host 0.0.0.0
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8888/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
