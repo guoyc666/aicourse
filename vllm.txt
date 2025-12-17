@@ -1,0 +1,5 @@
+vllm serve ./hf_models/Qwen2.5-7B \
+  --served-model-name aicourse \
+  --lora-modules my_lora=./hf_models/qwen_ft \
+  --port 8888 \
+  --host 0.0.0.0

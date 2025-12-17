@@ -2,7 +2,7 @@ import request from './request'
 
 // 获取资源列表
 export const getResources = (params) => {
-  return request.get('/resources/', { params })
+  return request.get('/resources', { params })
 }
 
 // 上传资源文件

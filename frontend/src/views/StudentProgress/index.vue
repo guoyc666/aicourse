@@ -192,7 +192,7 @@ const getStudentQuestionRecords = async (userId) => {
   }
 
   try {
-    const response = await request.get('/api/question/record/list', {
+    const response = await request.get('/question/record/list', {
       params: {
         user_id: userId,
         limit: 100
